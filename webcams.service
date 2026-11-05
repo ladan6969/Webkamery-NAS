@@ -17,7 +17,9 @@ RestartSec=10
 StandardOutput=append:/opt/webcams/logs/service.log
 StandardError=append:/opt/webcams/logs/service.log
 # omezení, ať webkamery nepřetíží server (2 jádra, 2 GB)
-MemoryMax=400M
+MemoryMax=600M
+# pád podprocesu (yt-dlp, Deno) po překročení paměti nesmí zastavit celou službu
+OOMPolicy=continue
 CPUQuota=80%
 NoNewPrivileges=true
 ProtectSystem=strict

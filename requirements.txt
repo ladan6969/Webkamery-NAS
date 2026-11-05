@@ -19,3 +19,5 @@ uvloop==0.23.0
 watchfiles==1.3.0
 websockets==17.4
 yt-dlp==2026.10.26
+yt-dlp-ejs
+deno

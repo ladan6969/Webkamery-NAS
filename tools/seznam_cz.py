@@ -111,7 +111,7 @@ S = [
 ("zlin-namesti-miru","Zlín – náměstí Míru","Zlínský kraj","město","https://www.youtube.com/watch?v=CSAcxQA2shE","youtube",""),
 ("holesov-capi-hnizdo","Holešov – čapí hnízdo","Zlínský kraj","ptáci","https://www.youtube.com/@mestoholesov5110/live","youtube",""),
 ("stare-mesto-u-uh-capi-hnizdo","Staré Město u UH – čapí hnízdo","Zlínský kraj","ptáci","https://www.ipcamlive.com/player/player.php?alias=5ca7589bb4c42","ipcamlive",""),
-("vsetin-panorama","Vsetín – panorama","Zlínský kraj","město","https://www.skylinewebcams.com/en/webcam/czech-republic/zlin/vsetin/vsetin.html","skyline",""),
+("vsetin-panorama","Vsetín – světelná křižovatka","Zlínský kraj","město","https://www.skylinewebcams.com/en/webcam/czech-republic/zlin/vsetin/vsetin.html","skyline",""),
 ("vsetin-kruhovy-objezd","Vsetín – kruhový objezd","Zlínský kraj","doprava","https://www.skylinewebcams.com/en/webcam/czech-republic/zlin/vsetin/roundabout.html","skyline",""),
 ("holesov-panorama","Holešov – panorama","Zlínský kraj","město","https://www.skylinewebcams.com/en/webcam/czech-republic/zlin/hole-ov/holesov.html","skyline",""),
 ("otrokovice-panorama-skyline","Otrokovice – panorama (Skyline)","Zlínský kraj","město","https://www.skylinewebcams.com/en/webcam/czech-republic/zlin/otrokovice/otrokovice.html","skyline",""),

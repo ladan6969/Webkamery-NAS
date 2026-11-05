@@ -97,10 +97,38 @@ if "$DEST/venv/bin/pip" install -q --prefer-binary -r "$DEST/requirements-nas.tx
 else
   # armv7 bez hotového pydantic-core → starší FastAPI s čistě pythonovým pydantic 1 (služba žádné modely nepoužívá)
   echo "  ! pydantic 2 nejde nainstalovat (armv7), zkouším pydantic 1"
-  "$DEST/venv/bin/pip" install -q --prefer-binary "fastapi==0.99.1" "pydantic<2" "uvicorn<0.30" httpx yt-dlp \
+  "$DEST/venv/bin/pip" install -q --prefer-binary "fastapi==0.99.1" "pydantic<2" "uvicorn<0.30" httpx yt-dlp yt-dlp-ejs \
     && ok "knihovny (FastAPI 0.99 + pydantic 1)" || { echo "  ✗ knihovny se nenainstalovaly – viz výpis výše"; exit 1; }
 fi
 "$DEST/venv/bin/python" -c "import fastapi, uvicorn, httpx, yt_dlp" && ok "import knihoven v pořádku" || { echo "  ✗ import selhal"; exit 1; }
+
+echo "== 3b) JavaScript pro YouTube"
+# YouTube vyžaduje JS prostředí. x86_64/aarch64: Deno z PyPI; armv7 nebo když Deno nejde: QuickJS (pevná verze + kontrola otisku).
+QJS_VER=v0.18.0
+case "$(uname -m)" in
+  x86_64)  QJS_ARCH=x86_64;  QJS_SHA=85ded23b9fabe8c1644fc40a8d2bbdd71157affcbd807359c618cc717ee24d7d; ZKUS_DENO=1 ;;
+  aarch64) QJS_ARCH=aarch64; QJS_SHA=2c005c7171424a598d31c53c8dc4a0ae2e4958eb6fbb37908c885a307c78187c; ZKUS_DENO=1 ;;
+  armv7*)  QJS_ARCH=armv7;   QJS_SHA=4bbc426083b4a31f35cbb9471ce6138a8d8db8efdfce15b596597ad60ddd79ac; ZKUS_DENO= ;;
+  *)       QJS_ARCH=; QJS_SHA=; ZKUS_DENO= ;;
+esac
+JS_OK=
+if [ -n "$ZKUS_DENO" ] && "$DEST/venv/bin/pip" install -q --prefer-binary deno 2>/dev/null \
+   && "$DEST/venv/bin/deno" --version >/dev/null 2>&1; then
+  JS_OK=1; ok "Deno"
+elif [ -n "$ZKUS_DENO" ]; then
+  "$DEST/venv/bin/pip" uninstall -q -y deno >/dev/null 2>&1
+fi
+if [ -z "$JS_OK" ] && [ -n "$QJS_ARCH" ]; then
+  Q="$DEST/venv/bin/qjs"
+  if curl -fsSL -m 120 -o "$Q.tmp" "https://github.com/quickjs-ng/quickjs/releases/download/$QJS_VER/qjs-linux-$QJS_ARCH" \
+     && [ "$("$DEST/venv/bin/python" -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$Q.tmp")" = "$QJS_SHA" ] \
+     && chmod 755 "$Q.tmp" && "$Q.tmp" -e 'console.log(1)' >/dev/null 2>&1; then
+    mv -f "$Q.tmp" "$Q"; JS_OK=1; ok "QuickJS $QJS_VER ($QJS_ARCH)"
+  else
+    rm -f "$Q.tmp"
+  fi
+fi
+[ -n "$JS_OK" ] || echo "  ! JS prostředí se nepodařilo připravit – část kamer z YouTube nepůjde načíst; instalace pokračuje"
 
 echo "== 4) nastavení"
 IP=$(ip -4 addr 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1)
@@ -118,7 +146,23 @@ if novy:
     for k in ("access_keys", "secret", "cron_token", "admin_password_hash"): c.pop(k, None)
     c["telegram"] = {"token": "", "chat_id": ""}
     c["vlastni_nas"] = 1
+# slabý armv7: JS výzva trvá déle a kamery se kontrolují po menších dávkách
+if os.uname().machine.startswith("armv"):
+    if c.get("resolve_timeout", 30) < 120: c["resolve_timeout"] = 120
+    if c.get("check_parallel", 6) > 2: c["check_parallel"] = 2
 json.dump(c, open("config.json", "w"), ensure_ascii=False, indent=1)
+# oprava seznamu kamer u stávající instalace (vlastní úpravy zůstávají)
+if os.path.exists("cams.json"):
+    k = json.load(open("cams.json")); zmena = False
+    for x in k:
+        if x.get("id") == "vsetin-panorama" and x.get("name") == "Vsetín – panorama":
+            x["name"] = "Vsetín – světelná křižovatka"; zmena = True
+    if not any(x.get("id") == "vsetin-koupaliste" for x in k):
+        k.append({"id": "vsetin-koupaliste", "name": "Vsetín – koupaliště", "group": "Zlínský kraj", "country": "CZ", "category": "město",
+                  "source": "https://www.youtube.com/@servissychrovnet3844", "type": "ytkanal", "match": "Vsetín - koupaliště",
+                  "headers": {}, "mode": "auto", "enabled": True, "regex": "", "page": "", "note": ""}); zmena = True
+    if zmena:
+        json.dump(k, open("cams.json.tmp", "w"), ensure_ascii=False, indent=1); os.replace("cams.json.tmp", "cams.json")
 print("  ✓ bind 0.0.0.0, port %d, public_base %s" % (port, c["public_base"]))
 open(".nove_heslo", "w").write("1" if novy else "")
 PY
@@ -146,7 +190,7 @@ case "\$1" in
   restart) \$0 stop; sleep 2; \$0 start ;;
   status)  [ -f \$D/webcams.pid ] && kill -0 \$(cat \$D/webcams.pid) 2>/dev/null && echo "běží (pid \$(cat \$D/webcams.pid))" || echo "neběží" ;;
   kontrola) curl -s -m 30 -X POST -H "X-Webcams-Token: \$(\$D/venv/bin/python -c 'import json;print(json.load(open("'\$D'/config.json"))["cron_token"])')" http://127.0.0.1:$PORT/admin/api/check >> \$D/logs/cron.log 2>&1 ;;
-  ytdlp)   \$D/venv/bin/pip install -q -U yt-dlp >> \$D/logs/ytdlp-update.log 2>&1 ;;
+  ytdlp)   \$D/venv/bin/pip install -q -U yt-dlp yt-dlp-ejs >> \$D/logs/ytdlp-update.log 2>&1 ;;
   *) echo "použití: \$0 start|stop|restart|status|kontrola|ytdlp" ;;
 esac
 EOF

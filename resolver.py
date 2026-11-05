@@ -16,6 +16,18 @@ import hls
 
 log = logging.getLogger("webcams")
 YTDLP = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
+# YouTube vyžaduje vyřešení JS výzvy. Běh je paměťově náročný (Deno ~325 MB), proto vždy jen jeden naráz.
+_YTDLP_ZAMEK = asyncio.Semaphore(1)
+
+
+def _js_runtime():
+    """--js-runtimes s prostředím ve venv (Deno, na armv7 QuickJS); bez něj část přenosů YouTube nejde načíst"""
+    slozka = os.path.dirname(sys.executable)
+    for nazev, soubor in (("deno", "deno"), ("quickjs", "qjs")):
+        cesta = os.path.join(slozka, soubor)
+        if os.access(cesta, os.X_OK):
+            return ["--js-runtimes", "%s:%s" % (nazev, cesta)]
+    return []
 DEFAULT_RE = r"""https?://[^"'\s<>\\]+?\.m3u8[^"'\s<>\\]*"""
 
 
@@ -32,16 +44,18 @@ async def _direct(cfg, cam):
 
 
 async def _ytdlp(cfg, cam):
-    args = [YTDLP, "-J", "--no-warnings", "--no-playlist", "--no-cache-dir", "--socket-timeout", "15"]
+    args = [YTDLP, "-J", "--no-warnings", "--no-playlist", "--no-cache-dir", "--socket-timeout", "15"] + _js_runtime()
     for k, v in (cam.get("headers") or {}).items():
         args += ["--add-header", "%s:%s" % (k, v)]
     args.append(cam["source"])
-    p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    try:
-        out, err = await asyncio.wait_for(p.communicate(), timeout=cfg["resolve_timeout"])
-    except asyncio.TimeoutError:
-        p.kill()
-        raise ResolveError("yt-dlp: timeout %d s" % cfg["resolve_timeout"])
+    async with _YTDLP_ZAMEK:
+        p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        try:
+            out, err = await asyncio.wait_for(p.communicate(), timeout=cfg["resolve_timeout"])
+        except asyncio.TimeoutError:
+            p.kill()
+            await p.wait()
+            raise ResolveError("yt-dlp: timeout %d s" % cfg["resolve_timeout"])
     if p.returncode != 0:
         msg = (err.decode(errors="replace").strip().splitlines() or ["?"])[-1]
         raise ResolveError("yt-dlp: " + msg[:300])

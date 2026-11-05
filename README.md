@@ -27,6 +27,8 @@ Odzkoušeno na **Synology DS216play** (armv7, 1 GB RAM, bez Dockeru). Docker nen
 - internet na NASu
 - volný port **8093**
 
+Kvůli YouTube instalátor doplní také JavaScriptové prostředí: Deno na x86_64 a aarch64, QuickJS na armv7. Stáhne ho sám.
+
 Instalátor všechno ověří sám. Když něco chybí, vypíše co a skončí bez instalace.
 
 ## 2. Příprava NASu
@@ -182,7 +184,8 @@ Příkazy spouštěj na NASu jako root.
 | `/health` neodpovídá | Ověř `status`, spusť `restart` a podívej se do logu. |
 | Doma to jde, zvenku ne | Zkontroluj přesměrování portu a krok 7. |
 | Kamera nejde přehrát | Otestuj ji v administraci, zdroj může být dočasně mimo provoz. |
-| YouTube kamery přestaly jít | Spusť `ytdlp` a pak `restart`. |
+| YouTube kamery přestaly jít | Spusť `ytdlp` a pak `restart`. Instalační log musí v kroku 3b hlásit Deno nebo QuickJS, jinak spusť instalaci znovu. |
+| Kamera z YouTube se pouští dlouho | Na armv7 může načtení trvat i desítky sekund, QuickJS je pomalý. |
 
 ## 10. Přidání kamery
 
