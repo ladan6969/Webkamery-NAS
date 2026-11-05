@@ -211,7 +211,10 @@ Hlavičky se zadávají jako JSON, například `{"Referer": "https://www.example
 **Automatický aktualizátor kamer:** jednou spusť v Plánovači úloh jako root příkaz níže. Pak se každý den ve 4:30 doplní nové kamery z `tools/kamery_pridat.json` na GitHubu, bez přeinstalace a bez restartu. Vlastní kamery zůstanou a kameru, kterou smažeš, automatika nevrátí. Výpis je v `/volume1/webcams/logs/doplnit.log`. Nové instalace mají automatiku zapnutou samy.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/doplnit_kamery.py -o /volume1/webcams/tools/doplnit_kamery.py && /volume1/webcams/venv/bin/python /volume1/webcams/tools/doplnit_kamery.py --instalovat
+cd /volume1/webcams || exit 1
+U=https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main
+curl -fsSL $U/tools/doplnit_kamery.py -o tools/doplnit_kamery.py || exit 1
+venv/bin/python tools/doplnit_kamery.py --instalovat
 ```
 
 ## 11. Aktualizace a odinstalace
