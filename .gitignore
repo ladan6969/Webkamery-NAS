@@ -1,0 +1,16 @@
+# tajné údaje a provozní stav
+config.json
+state.json
+cams.json
+*PRISTUP*
+.nove_heslo
+*.pid
+# prostředí a generované soubory
+venv/
+__pycache__/
+*.pyc
+logs/
+thumbs/
+*.log
+# hotový instalační balík (obsahuje data kamer)
+nas/*.run

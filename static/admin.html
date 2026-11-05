@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Webkamery – správa</title>
+<style>
+:root{--bg:#f4f6fa;--karta:#fff;--txt:#1f2933;--sed:#616e7c;--linka:#e4e7eb;--modra:#2563eb;--ok:#2e7d32;--pomala:#b26a00;--mrtva:#c62828}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--karta);border-bottom:1px solid var(--linka)}
+h1{font-size:1.2rem;margin:0}main{padding:16px 20px;max-width:1400px;margin:0 auto}
+.btn{border:1px solid var(--linka);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.9rem}
+.btn.hl{background:var(--modra);color:#fff;border-color:var(--modra)}.btn:disabled{opacity:.5;cursor:default}
+.karta{background:var(--karta);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:14px 16px;margin-bottom:16px}
+.odkazy a{display:inline-block;margin:3px 12px 3px 0;color:var(--modra);word-break:break-all}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--linka);vertical-align:middle}
+th{color:var(--sed);font-weight:600;font-size:.8rem;text-transform:uppercase}
+img.nah{width:120px;height:68px;object-fit:cover;border-radius:6px;background:#cfd8dc;display:block}
+.st{font-weight:600}.st.ok{color:var(--ok)}.st.pomalá{color:var(--pomala)}.st.mrtvá{color:var(--mrtva)}.st.nic{color:var(--sed)}
+.sed{color:var(--sed);font-size:.82rem}.vyp{opacity:.45}.akce .btn{padding:4px 8px;margin:2px}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--sed)}
+.form input,.form select,.form textarea{padding:8px;border:1px solid #cbd2d9;border-radius:8px;font:inherit;color:var(--txt)}
+.form .siroke{grid-column:1/-1}
+.filtry{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.filtry select,.filtry input{padding:7px 8px;border:1px solid #cbd2d9;border-radius:8px;font:inherit;max-width:260px}
+tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}.strana{padding:4px 10px}.strana.akt{background:var(--modra);color:#fff;border-color:var(--modra)}#vysl{margin-top:12px}#vysl img{max-width:320px;border-radius:8px;display:block;margin-top:8px}
+@media (max-width:800px){.skryt-m{display:none}}
+</style></head><body>
+<header><h1>📷 Webkamery</h1>
+<div><span id="stavKontroly" class="sed"></span>
+<button class="btn" onclick="kontrola()">▶ Spustit kontrolu všech</button>
+<button class="btn" onclick="novaKamera()">＋ Přidat kameru</button>
+<a class="btn" href="logout" style="text-decoration:none;color:inherit">Odhlásit</a></div></header>
+<main>
+<div class="karta odkazy" id="odkazy"></div>
+
+<div class="karta" id="formKarta" style="display:none">
+<h3 id="formNadpis" style="margin:0 0 10px">Kamera</h3>
+<div class="form">
+<label class="siroke">Zdroj (stránka, YouTube /@kanal/live, m3u8…)<input id="f_source" placeholder="https://www.youtube.com/@kanal/live"></label>
+<label>ID (a-z, 0-9, -)<input id="f_id" placeholder="pula"></label>
+<label>Název<input id="f_name" placeholder="Pula – přístav"></label>
+<label>Skupina (jen bez země)<input id="f_group" placeholder="Ostatní"></label>
+<label>Země (podle ní kategorie v playlistu)<select id="f_country"></select></label>
+<label>Kategorie<input id="f_category" placeholder="moře"></label>
+<label>Typ<select id="f_type"><option>auto</option><option>direct</option><option>ytdlp</option><option>ytkanal</option><option>skyline</option><option>feratel</option><option>ipcamlive</option><option>mjpeg</option><option>regex</option></select></label>
+<label>Název přenosu (ytkanal: kanál + text z názvu, re:… = regex)<input id="f_match" placeholder="Times Square"></label>
+<label>Mód<select id="f_mode"><option>auto</option><option>redirect</option><option>proxy</option></select></label>
+<label>Regex (jen typ regex)<input id="f_regex" placeholder="výchozí: …\.m3u8…"></label>
+<label class="siroke">Hlavičky (JSON, např. {"Referer":"https://…"})<textarea id="f_headers" rows="2">{}</textarea></label>
+</div>
+<div style="margin-top:12px"><button class="btn" id="btnTest" onclick="otestovat()">🔎 Otestovat</button>
+<button class="btn hl" onclick="ulozit()">💾 Uložit</button> <button class="btn" onclick="zavrit()">Zavřít</button></div>
+<div id="vysl"></div></div>
+
+<div class="karta filtry">
+<select id="fStav" onchange="vykresli(1)"><option value="ok">Stav: funkční (OK + pomalé)</option><option value="">Stav: vše</option>
+  <option value="mrtvá">nefunkční</option><option value="nic">neověřené</option><option value="skryta">skryté (3× v řadě)</option><option value="vyp">vypnuté</option></select>
+<select id="fKat" onchange="vykresli(1)"></select>
+<select id="fZeme" onchange="vykresli(1)"></select>
+<select id="fTema" onchange="vykresli(1)"></select>
+<select id="fTyp" onchange="vykresli(1)"></select>
+<input id="fHledat" placeholder="Hledat v názvu…" oninput="clearTimeout(window._ht);window._ht=setTimeout(()=>vykresli(1),250)">
+<span id="fPocet" class="sed"></span>
+</div>
+<div class="karta"><table><thead><tr><th>Náhled</th><th>Název</th><th class="skryt-m">Země / kategorie</th><th>Typ / mód</th><th>Stav</th><th class="skryt-m">Poslední úspěch</th><th class="skryt-m">Rozlišení</th><th>Akce</th></tr></thead>
+<tbody id="tab"></tbody></table><div id="strany" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap"></div></div>
+</main>
+<script>
+let D = {}, puvodni = null;
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function api(cesta, opt = {}) {
+  const r = await fetch('api/' + cesta, Object.assign({headers: {'Content-Type': 'application/json'}}, opt));
+  if (r.status === 401) { location.href = 'login'; throw 0; }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || d.error || ('HTTP ' + r.status));
+  return d;
+}
+const zemeN = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : (c.group || 'Ostatní');
+async function nacti() {
+  D = await api('cams');
+  const sel = document.getElementById('f_country');
+  if (!sel.options.length) sel.innerHTML = '<option value="">— bez země —</option>' +
+    Object.entries(D.zeme).sort((a, b) => a[1].localeCompare(b[1], 'cs')).map(([k, n]) => `<option value="${k}">${esc(n)} (${k})</option>`).join('');
+  document.getElementById('odkazy').innerHTML = '<b>Odkazy pro přehrávače:</b><br>' +
+    Object.entries(D.odkazy).map(([n, u]) => `<a href="${esc(u)}" target="_blank">${esc(n)}</a>`).join('');
+  const k = D.kontrola;
+  document.getElementById('stavKontroly').textContent = k.active ? `kontrola běží ${k.done}/${k.total} · ` :
+    (D.last_check ? 'poslední kontrola ' + D.last_check + ' · ' : '');
+  const kl = Object.keys(D.odkazy).length ? new URL(D.odkazy.EPG).searchParams.get('k') : '';
+  naplnFiltry();
+  vykresli(window._strana || 1);
+  if (k.active) setTimeout(nacti, 4000);
+}
+const NA_STRANU = 100;
+const stavKamery = c => { const s = D.state[c.id] || {};
+  if (!c.enabled) return 'vyp'; if ((s.fail_streak || 0) >= D.dead_after) return 'skryta'; return s.status || 'nic'; };
+function moznosti(id, popis, hodnoty) {
+  const el = document.getElementById(id), byla = el.value;
+  const n = {}; hodnoty.forEach(h => n[h] = (n[h] || 0) + 1);
+  el.innerHTML = `<option value="">${popis}: vše</option>` + Object.keys(n).sort((a, b) => a.localeCompare(b, 'cs'))
+    .map(h => `<option value="${esc(h)}">${esc(h || '—')} (${n[h]})</option>`).join('');
+  if (byla && n[byla] !== undefined) el.value = byla;
+}
+function naplnFiltry() {
+  moznosti('fKat', 'Kategorie', D.cams.map(c => c._kat));
+  moznosti('fZeme', 'Země', D.cams.map(c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : ''));
+  moznosti('fTema', 'Zaměření', D.cams.map(c => c._tema));
+  moznosti('fTyp', 'Typ', D.cams.map(c => c.type));
+}
+function radek(c) {
+  const s = D.state[c.id] || {}, st = s.status || 'nic';
+  const skryta = (s.fail_streak || 0) >= D.dead_after;
+  return `<tr class="${c.enabled ? '' : 'vyp'}">
+      <td><img class="nah" src="../thumb/${esc(c.id)}.jpg?k=${encodeURIComponent(KL)}&t=${Date.now() / 3600000 | 0}" loading="lazy"></td>
+      <td><b>${esc(c.name)}</b><div class="sed">${esc(c.id)} · <a href="${esc(c.source)}" target="_blank">zdroj</a></div></td>
+      <td class="skryt-m">${esc(c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '—')}<div class="sed">${esc([c._tema, c.group !== 'Ostatní' ? c.group : ''].filter(Boolean).join(' · '))}</div></td>
+      <td>${esc(c.type === 'auto' ? 'auto → ' + (s.type_used || '?') : c.type)}<div class="sed">${esc(c.mode)}${s.force_proxy && c.mode === 'auto' ? ' → proxy' : ''}${Object.keys(c.headers || {}).length ? ' · hlavičky' : ''}${D.cache[c.id] ? ' · v cache ' + Math.round(D.cache[c.id].zbyva_s / 60) + ' min' : ''}</div></td>
+      <td><span class="st ${esc(st)}">${st === 'nic' ? 'neověřeno' : esc(st)}</span>${skryta ? '<div class="sed">skrytá (' + s.fail_streak + '× v řadě)</div>' : (s.fail_streak ? '<div class="sed">neúspěch ' + s.fail_streak + '×</div>' : '')}
+        ${s.error ? '<div class="sed" title="' + esc(s.error) + '">' + esc(s.error.slice(0, 60)) + '</div>' : ''}${c.note ? '<div class="sed">' + esc(c.note.slice(0, 70)) + '</div>' : ''}</td>
+      <td class="skryt-m">${esc(s.last_ok || '—')}</td>
+      <td class="skryt-m">${esc(s.resolution || '—')}${s.fps ? ' · ' + s.fps + ' fps' : ''}${s.codec ? '<div class="sed">' + esc(s.codec) + '</div>' : ''}</td>
+      <td class="akce"><button class="btn" onclick="uprav('${esc(c.id)}')">✏️</button>
+        <button class="btn" title="Otestovat teď" onclick="kontrola('${esc(c.id)}')">🔎</button>
+        <button class="btn" onclick="prepni('${esc(c.id)}')">${c.enabled ? 'Vypnout' : 'Zapnout'}</button>
+        <button class="btn" onclick="smaz('${esc(c.id)}')">🗑</button></td></tr>`;
+}
+let KL = '';
+function vykresli(strana) {
+  window._strana = strana;
+  KL = Object.keys(D.odkazy).length ? new URL(D.odkazy.EPG).searchParams.get('k') : '';
+  const f = id => document.getElementById(id).value, q = f('fHledat').toLowerCase();
+  const zn = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '';
+  const vys = D.cams.filter(c => {
+    const st = stavKamery(c);
+    if (f('fStav') === 'ok' ? !(st === 'ok' || st === 'pomalá') : (f('fStav') && st !== f('fStav'))) return false;
+    if (f('fKat') && c._kat !== f('fKat')) return false;
+    if (f('fZeme') && zn(c) !== f('fZeme')) return false;
+    if (f('fTema') && c._tema !== f('fTema')) return false;
+    if (f('fTyp') && c.type !== f('fTyp')) return false;
+    if (q && !(c.name + ' ' + c.id).toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => (a._kat.startsWith('Česko') ? 0 : 1) - (b._kat.startsWith('Česko') ? 0 : 1) ||
+                    (a._kat + '\u0000' + a.name).localeCompare(b._kat + '\u0000' + b.name, 'cs'));
+  const stran = Math.max(1, Math.ceil(vys.length / NA_STRANU)); strana = Math.min(strana, stran);
+  const cast = vys.slice((strana - 1) * NA_STRANU, strana * NA_STRANU);
+  const nKat = {}; vys.forEach(c => nKat[c._kat] = (nKat[c._kat] || 0) + 1);
+  let posl = null, html = '';
+  for (const c of cast) {
+    if (c._kat !== posl) { posl = c._kat; html += `<tr class="skupina"><td colspan="8">${esc(posl)} <span class="sed">(${nKat[posl]})</span></td></tr>`; }
+    html += radek(c);
+  }
+  document.getElementById('tab').innerHTML = html || '<tr><td colspan="8" class="sed">Nic neodpovídá filtru.</td></tr>';
+  const vse = D.cams.length, ok = D.cams.filter(c => ['ok', 'pomalá'].includes(stavKamery(c))).length;
+  document.getElementById('fPocet').textContent = `zobrazeno ${vys.length} z ${vse} · funkčních ${ok}`;
+  let p = '';
+  if (stran > 1) for (let i = 1; i <= stran; i++)
+    if (i <= 3 || i > stran - 3 || Math.abs(i - strana) <= 2) p += `<button class="btn strana${i === strana ? ' akt' : ''}" onclick="vykresli(${i});scrollTo(0,0)">${i}</button>`;
+    else if (!p.endsWith('… ')) p += '… ';
+  document.getElementById('strany').innerHTML = p;
+}
+const pole = ['source', 'id', 'name', 'group', 'country', 'category', 'type', 'mode', 'regex', 'match'];
+function vyplnit(c) {
+  pole.forEach(p => document.getElementById('f_' + p).value = c[p] ?? (p === 'type' || p === 'mode' ? 'auto' : ''));
+  document.getElementById('f_headers').value = JSON.stringify(c.headers || {});
+  document.getElementById('vysl').innerHTML = '';
+  document.getElementById('formKarta').style.display = '';
+  document.getElementById('formKarta').scrollIntoView({behavior: 'smooth'});
+}
+function novaKamera() { puvodni = null; document.getElementById('formNadpis').textContent = 'Nová kamera'; vyplnit({group: 'Ostatní'}); }
+function uprav(id) { const c = D.cams.find(x => x.id === id); puvodni = id; document.getElementById('formNadpis').textContent = 'Upravit: ' + c.name; vyplnit(c); }
+function zavrit() { document.getElementById('formKarta').style.display = 'none'; }
+function formData() {
+  const d = {}; pole.forEach(p => d[p] = document.getElementById('f_' + p).value.trim());
+  try { d.headers = JSON.parse(document.getElementById('f_headers').value || '{}'); } catch (e) { throw new Error('Hlavičky nejsou platný JSON'); }
+  d.enabled = puvodni ? (D.cams.find(x => x.id === puvodni) || {}).enabled !== false : true;
+  return d;
+}
+async function otestovat() {
+  const v = document.getElementById('vysl'), b = document.getElementById('btnTest');
+  try {
+    const d = formData(); if (!d.id) d.id = 'test';
+    b.disabled = true; v.innerHTML = '<span class="sed">Testuji (resolve, živost, ffprobe, náhled) – až 1 min…</span>';
+    const r = await api('test', {method: 'POST', body: JSON.stringify(d)});
+    v.innerHTML = r.ok ? `<span class="st ${esc(r.status)}">✔ ${esc(r.status)}</span> · typ ${esc(r.type)} · ${esc(r.resolution)} · ${r.fps} fps · ${esc(r.codec)} · start ${r.seconds} s` +
+      (r.thumb ? `<img src="${r.thumb}">` : '<div class="sed">náhled se nepovedl</div>') : `<span class="st mrtvá">✘ nejde</span><div class="sed">${esc(r.error)}</div>`;
+  } catch (e) { v.innerHTML = '<span class="st mrtvá">' + esc(e.message || e) + '</span>'; }
+  b.disabled = false;
+}
+async function ulozit() {
+  try { const d = formData(); d.puvodni_id = puvodni; await api('cams', {method: 'POST', body: JSON.stringify(d)}); zavrit(); nacti(); }
+  catch (e) { alert(e.message || e); }
+}
+async function prepni(id) { await api('cams/' + encodeURIComponent(id) + '/prepnout', {method: 'POST'}); nacti(); }
+async function smaz(id) { if (confirm('Smazat kameru ' + id + '?')) { await api('cams/' + encodeURIComponent(id), {method: 'DELETE'}); nacti(); } }
+async function kontrola(id) {
+  try { await api('check' + (id ? '?id=' + encodeURIComponent(id) : ''), {method: 'POST'}); setTimeout(nacti, 800); }
+  catch (e) { alert(e.message || e); }
+}
+nacti();
+</script></body></html>

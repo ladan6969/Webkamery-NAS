@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Webkamery – přihlášení</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f4f6fa;color:#1f2933;display:flex;min-height:100vh;align-items:center;justify-content:center}
+form{background:#fff;padding:28px 32px;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08);width:300px}
+h1{font-size:1.2rem;margin:0 0 16px}input{width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd2d9;border-radius:8px;font-size:1rem}
+button{margin-top:14px;width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:1rem;cursor:pointer}
+.chyba{color:#c62828;margin-top:10px;min-height:1em}
+</style></head><body>
+<form method="post" action="login"><h1>📷 Webkamery</h1>
+<input type="password" name="heslo" placeholder="Heslo" autofocus required>
+<button type="submit">Přihlásit</button><div class="chyba">{{CHYBA}}</div></form>
+</body></html>

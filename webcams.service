@@ -1,0 +1,28 @@
+# /etc/systemd/system/webcams.service – Webcams proxy (/opt/webcams), jen 127.0.0.1:8093, ven přes nginx /webcams/
+[Unit]
+Description=Webcams proxy (stálé adresy živých webkamer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=webcams
+Group=webcams
+WorkingDirectory=/opt/webcams
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/opt/webcams
+ExecStart=/opt/webcams/venv/bin/python /opt/webcams/main.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/opt/webcams/logs/service.log
+StandardError=append:/opt/webcams/logs/service.log
+# omezení, ať webkamery nikdy nepřetíží Caolinu (2 jádra, 2 GB)
+MemoryMax=400M
+CPUQuota=80%
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/webcams
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

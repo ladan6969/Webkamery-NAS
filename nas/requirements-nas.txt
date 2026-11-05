@@ -1,0 +1,6 @@
+# NAS (armv7): bez uvloop/httptools/watchfiles/websockets (nativní, na armv7 se nepřeloží); verze jako na VPS
+fastapi==0.162.0
+pydantic==2.14.2
+uvicorn==0.54.0
+httpx==0.28.1
+yt-dlp
