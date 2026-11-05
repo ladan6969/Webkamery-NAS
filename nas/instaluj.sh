@@ -159,6 +159,8 @@ if os.path.exists("cams.json"):
             x["name"] = "Vsetín – světelná křižovatka"; zmena = True
     nove = json.load(open(sys.argv[3])) if os.path.exists(sys.argv[3]) else []     # kamery přidané v novějších verzích
     ids = {x.get("id") for x in k}
+    if os.path.exists("kamery_nabidnute.json"):      # smazanou kameru nevracet
+        ids |= set(json.load(open("kamery_nabidnute.json")))
     for x in nove:
         if x["id"] not in ids:
             k.append(x); zmena = True
@@ -206,6 +208,8 @@ if [ -f /etc/crontab ] && ! grep -q "webcams.sh kontrola" /etc/crontab; then
   printf '45\t4\t*\t*\t*\troot\t%s/webcams.sh kontrola\n15\t4\t*\t*\t1\troot\t%s/webcams.sh ytdlp\n' "$DEST" "$DEST" >> /etc/crontab
   (systemctl restart crond 2>/dev/null || synoservicectl --restart crond 2>/dev/null || true); ok "plán: kontrola 4:45, yt-dlp po 4:15"
 fi
+
+"$DEST/venv/bin/python" "$DEST/tools/doplnit_kamery.py" --instalovat "$DEST" 2>&1 | sed 's/^/  ✓ /' || true
 
 if [ -z "$BEZ_STARTU" ]; then
   "$DEST/webcams.sh" restart >/dev/null; sleep 6

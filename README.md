@@ -208,10 +208,10 @@ Režim přehrávání:
 
 Hlavičky se zadávají jako JSON, například `{"Referer": "https://www.example.com/"}`.
 
-**Hromadné doplnění nových kamer:** v Plánovači úloh spusť jako root příkaz níže. Bez přeinstalace a bez restartu doplní všechny kamery z `tools/kamery_pridat.json`, které v instalaci ještě nejsou. Vlastní kamery zůstanou, ale kamery z toho seznamu, které jsi smazal, se přidají znovu. Výpis najdeš ve výsledku úlohy.
+**Automatický aktualizátor kamer:** jednou spusť v Plánovači úloh jako root příkaz níže. Pak se každý den ve 4:30 doplní nové kamery z `tools/kamery_pridat.json` na GitHubu, bez přeinstalace a bez restartu. Vlastní kamery zůstanou a kameru, kterou smažeš, automatika nevrátí. Výpis je v `/volume1/webcams/logs/doplnit.log`. Nové instalace mají automatiku zapnutou samy.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/doplnit_kamery.py | /volume1/webcams/venv/bin/python -
+curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/doplnit_kamery.py -o /volume1/webcams/tools/doplnit_kamery.py && /volume1/webcams/venv/bin/python /volume1/webcams/tools/doplnit_kamery.py --instalovat
 ```
 
 ## 11. Aktualizace a odinstalace
@@ -223,6 +223,6 @@ curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/
 ```sh
 /volume1/webcams/webcams.sh stop
 rm -f /usr/local/etc/rc.d/S99webcams.sh
-sed -i '/webcams\.sh/d' /etc/crontab
+sed -i '/webcams\.sh/d; /doplnit_kamery\.py/d' /etc/crontab
 rm -rf /volume1/webcams
 ```
