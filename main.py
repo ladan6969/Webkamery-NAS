@@ -3,7 +3,7 @@
 Spuštění:  venv/bin/python main.py                (systemd webcams.service)
 Nastavení: venv/bin/python main.py --init         (vytvoří config.json: klíč pro přehrávače, tajemství, cron token)
            venv/bin/python main.py --heslo        (heslo do administrace)
-Služba poslouchá jen lokálně; ven ji pouští nginx (např. https://api.caolina.zone/webcams/ → 127.0.0.1:8093).
+Služba poslouchá jen lokálně; ven ji pouští nginx (např. https://example.com/webcams/ → 127.0.0.1:8093).
 """
 import asyncio
 import base64

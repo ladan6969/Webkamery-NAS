@@ -1,4 +1,4 @@
-"""Seznam českých kamer od Ladana (3. 11. 2026) – (id, název, kraj, kategorie, zdroj, extractor, feratel_cam)."""
+"""Seznam českých kamer (3. 11. 2026) – (id, název, kraj, kategorie, zdroj, extractor, feratel_cam)."""
 S = [
 ("liberec-vyhled-z-krajskeho-uradu","Liberec – výhled z krajského úřadu","Liberecký kraj","město","https://www.youtube.com/watch?v=NY4L8R8c40w","youtube",""),
 ("jested-vrchol","Ještěd – vrchol","Liberecký kraj","hory","https://www.feratel.com/en/webcams/czech-republic/liberec-region/jested-2101","feratel","2101"),

@@ -27,7 +27,7 @@ def nazev(kod):
     return ZEME.get(k, k)
 
 
-# zaměření kamery → sjednocená skupina (seznam od Ladana i sběr používaly různé názvy)
+# zaměření kamery → sjednocená skupina (ruční seznam i sběr používaly různé názvy)
 TEMA = {"město": "Města", "mesto": "Města", "hory": "Hory", "železnice": "Doprava", "letiště": "Doprava", "doprava": "Doprava",
         "přístav": "Voda", "moře": "Voda", "voda": "Voda", "ptáci": "Ptáci", "zvířata": "Zvířata", "příroda": "Příroda"}
 TEMA_SVET = {"Města": "Města", "Hory": "Hory", "Doprava": "Doprava (nádraží, letiště)", "Voda": "Moře, pláže a přístavy",

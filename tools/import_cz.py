@@ -1,4 +1,4 @@
-"""Převod Ladanova seznamu (tools/seznam_cz.py) do formátu služby → tools/import_cz.json (3. 11. 2026).
+"""Převod ručního seznamu (tools/seznam_cz.py) do formátu služby → tools/import_cz.json (3. 11. 2026).
 YouTube watch?v: zjistí kanál a název přenosu → ytkanal (přežije restart přenosu); nevysílající (sezónní) zůstane ytdlp.
 Spuštění: cd ~/webcams && venv/bin/python tools/import_cz.py
 """

@@ -1,5 +1,5 @@
 """Sloučení seznamů kamer → tools/finalni.json (3. 11. 2026).
-Přednost: Ladanův český seznam (import_cz.json) > kamery už ve službě (české názvy) > velký sběr (sber2.json).
+Přednost: ruční český seznam (import_cz.json) > kamery už ve službě (české názvy) > velký sběr (sber2.json).
 Duplicity podle klíče zdroje; nahrané odkazy watch?v se převedou na ytkanal podle kandidati.json.
 Spuštění: venv/bin/python tools/sloucit.py <cesta k aktuálnímu cams.json ze služby>
 """

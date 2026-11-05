@@ -1,5 +1,5 @@
 #!/bin/sh
-# Webkamery Caoliny – instalace na Synology NAS (DS216play: armv7, 1 GB RAM, bez Dockeru). 4. 11. 2026.
+# Webkamery – instalace na Synology NAS (DS216play: armv7, 1 GB RAM, bez Dockeru). 4. 11. 2026.
 # Tento skript je uvnitř samorozbalovacího souboru webcams-nas.run (nas/sestav.sh); samostatně se nespouští.
 #
 # Spuštění na NASu jako root – jedna z možností:
@@ -110,10 +110,9 @@ import json, os, sys
 port, pb = int(sys.argv[1]), sys.argv[2]
 c = json.load(open("config.json")) if os.path.exists("config.json") else {}
 c["bind"] = "0.0.0.0"; c["port"] = port
-if not c.get("public_base") or "127.0.0.1" in c["public_base"] or "caolina.zone" in c["public_base"] or os.environ.get("PUBLIC_BASE"):
+if not c.get("public_base") or "127.0.0.1" in c["public_base"] or not c.get("vlastni_nas") or os.environ.get("PUBLIC_BASE"):
     c["public_base"] = pb
-# 4. 11. 2026: NAS běží samostatně, bez nás → vlastní klíče, tajemství a heslo (nic z VPS; i u starší instalace
-# s kopií config.json z VPS se jednou vymění – značka vlastni_nas)
+# NAS běží samostatně → vlastní klíče, tajemství a heslo (u starší instalace se jednou vymění – značka vlastni_nas)
 novy = not c.get("vlastni_nas")
 if novy:
     for k in ("access_keys", "secret", "cron_token", "admin_password_hash"): c.pop(k, None)
