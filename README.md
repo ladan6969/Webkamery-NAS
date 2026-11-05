@@ -208,6 +208,12 @@ Režim přehrávání:
 
 Hlavičky se zadávají jako JSON, například `{"Referer": "https://www.example.com/"}`.
 
+**Hromadné doplnění nových kamer:** v Plánovači úloh spusť jako root příkaz níže. Bez přeinstalace a bez restartu doplní všechny kamery z `tools/kamery_pridat.json`, které v instalaci ještě nejsou. Vlastní kamery zůstanou, ale kamery z toho seznamu, které jsi smazal, se přidají znovu. Výpis najdeš ve výsledku úlohy.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/doplnit_kamery.py | /volume1/webcams/venv/bin/python -
+```
+
 ## 11. Aktualizace a odinstalace
 
 **Aktualizace:** stáhni a rozbal nový ZIP podle kroku 3 a znovu spusť krok 4. Nastavení, klíče, heslo, kamery a stav kontrol zůstanou. Seznam kamer z nového ZIPu se tím nepřepíše.
