@@ -157,10 +157,21 @@ if os.path.exists("cams.json"):
     for x in k:
         if x.get("id") == "vsetin-panorama" and x.get("name") == "Vsetín – panorama":
             x["name"] = "Vsetín – světelná křižovatka"; zmena = True
-    if not any(x.get("id") == "vsetin-koupaliste" for x in k):
-        k.append({"id": "vsetin-koupaliste", "name": "Vsetín – koupaliště", "group": "Zlínský kraj", "country": "CZ", "category": "město",
-                  "source": "https://www.youtube.com/@servissychrovnet3844", "type": "ytkanal", "match": "Vsetín - koupaliště",
-                  "headers": {}, "mode": "auto", "enabled": True, "regex": "", "page": "", "note": ""}); zmena = True
+    ZDROJ = "https://5b10f5ee6a4c9.streamlock.net:2937/"
+    def internext(i, n, kat, cesta):
+        return {"id": i, "name": n, "group": "Zlínský kraj", "country": "CZ", "category": kat, "source": ZDROJ + cesta, "type": "direct",
+                "match": "", "headers": {}, "mode": "auto", "enabled": True, "regex": "", "page": "https://www.internext.cz/webkamery/", "note": ""}
+    nove = [{"id": "vsetin-koupaliste", "name": "Vsetín – koupaliště", "group": "Zlínský kraj", "country": "CZ", "category": "město",
+             "source": "https://www.youtube.com/@servissychrovnet3844", "type": "ytkanal", "match": "Vsetín - koupaliště",
+             "headers": {}, "mode": "auto", "enabled": True, "regex": "", "page": "", "note": ""},
+            internext("vsetin-nadrazi", "Vsetín – nádraží", "doprava", "vsecam01/vsecam01.stream/playlist.m3u8"),
+            internext("valasske-mezirici-namesti", "Valašské Meziříčí – náměstí", "město", "vlmcam01/vlmcam01.stream/playlist.m3u8"),
+            internext("zlin-panorama-internext", "Zlín – panorama", "město", "zlncam01/zlncam01.stream/playlist.m3u8"),
+            internext("drzkova-vancica", "Držková – Vančica", "příroda", "zlncam02/zlncam02.stream/playlist.m3u8")]
+    ids = {x.get("id") for x in k}
+    for x in nove:
+        if x["id"] not in ids:
+            k.append(x); zmena = True
     if zmena:
         json.dump(k, open("cams.json.tmp", "w"), ensure_ascii=False, indent=1); os.replace("cams.json.tmp", "cams.json")
 print("  ✓ bind 0.0.0.0, port %d, public_base %s" % (port, c["public_base"]))
