@@ -11,6 +11,7 @@ cp $W/static/{admin.html,login.html} $T/kod/static/ 2>/dev/null || true
 cp $W/tools/{oprava_fail_streak.py,nazvy_mist.py} $T/kod/tools/ 2>/dev/null || true
 cp $N/requirements-nas.txt $T/kod/; cp $N/instaluj.sh $T/
 cp "${CAMS:-$W/tools/finalni.json}" $T/data/cams.json
+cp "$W/tools/kamery_pridat.json" $T/data/pridat.json
 OUT=$N/webcams-nas.run
 cat > $OUT <<'HLAVA'
 #!/bin/sh

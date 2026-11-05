@@ -133,7 +133,7 @@ fi
 echo "== 4) nastavení"
 IP=$(ip -4 addr 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1)
 PB=${PUBLIC_BASE:-http://${IP:-127.0.0.1}:$PORT}
-cd "$DEST" && "$DEST/venv/bin/python" - "$PORT" "$PB" <<'PY'
+cd "$DEST" && "$DEST/venv/bin/python" - "$PORT" "$PB" "$BALIK/data/pridat.json" <<'PY'
 import json, os, sys
 port, pb = int(sys.argv[1]), sys.argv[2]
 c = json.load(open("config.json")) if os.path.exists("config.json") else {}
@@ -157,17 +157,7 @@ if os.path.exists("cams.json"):
     for x in k:
         if x.get("id") == "vsetin-panorama" and x.get("name") == "Vsetín – panorama":
             x["name"] = "Vsetín – světelná křižovatka"; zmena = True
-    ZDROJ = "https://5b10f5ee6a4c9.streamlock.net:2937/"
-    def internext(i, n, kat, cesta):
-        return {"id": i, "name": n, "group": "Zlínský kraj", "country": "CZ", "category": kat, "source": ZDROJ + cesta, "type": "direct",
-                "match": "", "headers": {}, "mode": "auto", "enabled": True, "regex": "", "page": "https://www.internext.cz/webkamery/", "note": ""}
-    nove = [{"id": "vsetin-koupaliste", "name": "Vsetín – koupaliště", "group": "Zlínský kraj", "country": "CZ", "category": "město",
-             "source": "https://www.youtube.com/@servissychrovnet3844", "type": "ytkanal", "match": "Vsetín - koupaliště",
-             "headers": {}, "mode": "auto", "enabled": True, "regex": "", "page": "", "note": ""},
-            internext("vsetin-nadrazi", "Vsetín – nádraží", "doprava", "vsecam01/vsecam01.stream/playlist.m3u8"),
-            internext("valasske-mezirici-namesti", "Valašské Meziříčí – náměstí", "město", "vlmcam01/vlmcam01.stream/playlist.m3u8"),
-            internext("zlin-panorama-internext", "Zlín – panorama", "město", "zlncam01/zlncam01.stream/playlist.m3u8"),
-            internext("drzkova-vancica", "Držková – Vančica", "příroda", "zlncam02/zlncam02.stream/playlist.m3u8")]
+    nove = json.load(open(sys.argv[3])) if os.path.exists(sys.argv[3]) else []     # kamery přidané v novějších verzích
     ids = {x.get("id") for x in k}
     for x in nove:
         if x["id"] not in ids:
