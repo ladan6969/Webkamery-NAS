@@ -2,34 +2,81 @@
 <html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Webkamery – správa</title>
 <style>
-:root{--bg:#f4f6fa;--karta:#fff;--txt:#1f2933;--sed:#616e7c;--linka:#e4e7eb;--modra:#2563eb;--ok:#2e7d32;--pomala:#b26a00;--mrtva:#c62828}
+:root{--bg:#f3f5f9;--karta:#fff;--txt:#1f2933;--sed:#616e7c;--linka:#e4e7eb;--modra:#2563eb;--modra2:#1d4ed8;--ok:#2e7d32;--pomala:#b26a00;--mrtva:#c62828;--nic:#8a94a3}
+*{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
-header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--karta);border-bottom:1px solid var(--linka)}
-h1{font-size:1.2rem;margin:0}main{padding:16px 20px;max-width:1400px;margin:0 auto}
-.btn{border:1px solid var(--linka);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.9rem}
-.btn.hl{background:var(--modra);color:#fff;border-color:var(--modra)}.btn:disabled{opacity:.5;cursor:default}
-.karta{background:var(--karta);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:14px 16px;margin-bottom:16px}
-.odkazy a{display:inline-block;margin:3px 12px 3px 0;color:var(--modra);word-break:break-all}
+header{background:linear-gradient(120deg,#1e3a8a,#2563eb 55%,#0ea5e9);color:#fff;padding:16px 20px 50px}
+.hl-in{max-width:1400px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+h1{font-size:1.35rem;margin:0;display:flex;align-items:center;gap:10px}h1 small{font-weight:400;font-size:.85rem;opacity:.85}
+header .btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35);color:#fff}header .btn:hover{background:rgba(255,255,255,.25)}
+#stavKontroly{color:#e0ecff;font-size:.85rem;margin-right:6px}
+main{padding:16px 20px;max-width:1400px;margin:0 auto}
+.btn{border:1px solid var(--linka);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.9rem;color:inherit;text-decoration:none;display:inline-block}
+.btn:hover{border-color:#c5ccd6}.btn.hl{background:var(--modra);color:#fff;border-color:var(--modra)}.btn:disabled{opacity:.5;cursor:default}
+.karta{background:var(--karta);border-radius:12px;box-shadow:0 1px 4px rgba(15,23,42,.06);padding:14px 16px;margin-bottom:16px}
+/* přehled */
+.dlazdice{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin:-50px 0 16px;position:relative}
+.dl{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(15,23,42,.08);padding:12px 14px;cursor:pointer;border:2px solid transparent;transition:transform .1s}
+.dl:hover{transform:translateY(-2px)}.dl.akt{border-color:var(--modra)}
+.dl b{display:block;font-size:1.6rem;line-height:1.1}.dl span{color:var(--sed);font-size:.82rem}
+.dl.ok b{color:var(--ok)}.dl.pomala b{color:var(--pomala)}.dl.mrtva b{color:var(--mrtva)}.dl.skryta b{color:#7c3aed}.dl.zmena b{color:#0e7490}.dl.vypnute b{color:var(--nic)}.dl.obl b{color:#d97706}
+.hvezda{position:absolute;z-index:2;bottom:7px;left:7px;font-size:1.25rem;line-height:1;cursor:pointer;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);background:none;border:0;padding:0}
+.hvezda.on{color:#fbbf24}
+.varovani{border-left:4px solid var(--pomala);background:#fff8e1}.varovani ul{margin:6px 0 0;padding-left:20px}.varovani li{margin:3px 0}
+details.odkazy summary{cursor:pointer;font-weight:600;list-style:none}details.odkazy summary::before{content:"📋 "}
+.odk{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}.odk span{min-width:230px;color:var(--sed)}
+.odk code{flex:1;min-width:200px;background:#f1f5f9;border-radius:6px;padding:5px 8px;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* filtry */
+.filtry{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.filtry select,.filtry input{padding:7px 8px;border:1px solid #cbd2d9;border-radius:8px;font:inherit;max-width:240px;background:#fff}
+.prepinac{margin-left:auto;display:flex;border:1px solid #cbd2d9;border-radius:8px;overflow:hidden}.prepinac button{border:0;background:#fff;padding:7px 11px;cursor:pointer;font-size:.9rem}
+.prepinac button.akt{background:var(--modra);color:#fff}
+/* mřížka */
+.nadpis-skup{font-weight:700;color:#3730a3;margin:18px 2px 8px;font-size:.95rem}.nadpis-skup span{color:var(--sed);font-weight:400}
+.mriz{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.kam{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.08);display:flex;flex-direction:column}
+.kam.vyp{opacity:.5}
+.obr{position:relative;aspect-ratio:16/9;background:#cfd8dc center/cover no-repeat;cursor:pointer}
+.obr::after{content:"▶";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.2rem;color:#fff;opacity:0;background:rgba(15,23,42,.35);transition:opacity .15s}
+.obr:hover::after{opacity:1}.obr::after{pointer-events:none}.tecka,.stitky{z-index:1}
+.tecka{position:absolute;top:8px;left:8px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.tecka.ok{background:var(--ok)}.tecka.pomalá{background:var(--pomala)}.tecka.mrtvá{background:var(--mrtva)}.tecka.nic{background:var(--nic)}.tecka.skryta{background:#7c3aed}.tecka.vyp{background:#cbd2d9}
+.stitky{position:absolute;top:7px;right:7px;display:flex;gap:4px}
+.st-k{font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:5px;color:#fff;background:rgba(15,23,42,.65)}
+.typ-ytkanal,.typ-ytdlp{background:#dc2626}.typ-skyline{background:#2563eb}.typ-feratel{background:#16a34a}.typ-mjpeg,.typ-ipcamlive{background:#9333ea}.typ-direct,.typ-regex,.typ-auto{background:#475569}
+.popis{padding:9px 11px 6px;flex:1}.popis b{display:block;line-height:1.25}.popis .sed{margin-top:3px}
+.lista{display:flex;gap:2px;padding:4px 6px 8px;border-top:1px solid var(--linka)}.lista button{border:0;background:none;cursor:pointer;padding:5px 7px;border-radius:6px;font-size:.95rem}
+.lista button:hover{background:#f1f5f9}
+/* tabulka */
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--linka);vertical-align:middle}
 th{color:var(--sed);font-weight:600;font-size:.8rem;text-transform:uppercase}
-img.nah{width:120px;height:68px;object-fit:cover;border-radius:6px;background:#cfd8dc;display:block}
+img.nah{width:120px;height:68px;object-fit:cover;border-radius:6px;background:#cfd8dc;display:block;cursor:pointer}
+tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 .st{font-weight:600}.st.ok{color:var(--ok)}.st.pomalá{color:var(--pomala)}.st.mrtvá{color:var(--mrtva)}.st.nic{color:var(--sed)}
 .sed{color:var(--sed);font-size:.82rem}.vyp{opacity:.45}.akce .btn{padding:4px 8px;margin:2px}
+.strana{padding:4px 10px}.strana.akt{background:var(--modra);color:#fff;border-color:var(--modra)}
+/* formulář */
 .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--sed)}
 .form input,.form select,.form textarea{padding:8px;border:1px solid #cbd2d9;border-radius:8px;font:inherit;color:var(--txt)}
-.form .siroke{grid-column:1/-1}
-.filtry{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.filtry select,.filtry input{padding:7px 8px;border:1px solid #cbd2d9;border-radius:8px;font:inherit;max-width:260px}
-tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}.strana{padding:4px 10px}.strana.akt{background:var(--modra);color:#fff;border-color:var(--modra)}#vysl{margin-top:12px}#vysl img{max-width:320px;border-radius:8px;display:block;margin-top:8px}
-@media (max-width:800px){.skryt-m{display:none}}
+.form .siroke{grid-column:1/-1}#vysl{margin-top:12px}#vysl img{max-width:320px;border-radius:8px;display:block;margin-top:8px}
+/* přehrávač */
+#prehr{position:fixed;inset:0;background:rgba(15,23,42,.72);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+#prehr .okno{background:#fff;border-radius:14px;overflow:hidden;width:min(1100px,100%);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#prehr .hl2{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px}
+#prehr video,#prehr img{width:100%;aspect-ratio:16/9;background:#000;display:block;object-fit:contain}
+#prehrStav{font-size:.82rem;color:var(--sed);padding:8px 14px}
+@media (max-width:800px){.skryt-m{display:none}.prepinac{margin-left:0}main{padding:14px 12px}header{padding:14px 12px 46px}
+  .dlazdice{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:-46px}.dl{padding:8px 10px}.dl b{font-size:1.25rem}.dl span{font-size:.74rem}}
 </style></head><body>
-<header><h1>📷 Webkamery</h1>
-<div><span id="stavKontroly" class="sed"></span>
+<header><div class="hl-in"><h1>📷 Webkamery <small id="podtitul"></small></h1>
+<div><span id="stavKontroly"></span>
 <button class="btn" onclick="kontrola()">▶ Spustit kontrolu všech</button>
 <button class="btn" onclick="novaKamera()">＋ Přidat kameru</button>
-<a class="btn" href="logout" style="text-decoration:none;color:inherit">Odhlásit</a></div></header>
+<a class="btn" href="logout">Odhlásit</a></div></div></header>
 <main>
-<div class="karta odkazy" id="odkazy"></div>
+<div class="dlazdice" id="dlazdice"></div>
+<div class="karta varovani" id="varovani" style="display:none"></div>
+<details class="karta odkazy"><summary>Odkazy pro přehrávače</summary><div id="odkazy"></div></details>
 
 <div class="karta" id="formKarta" style="display:none">
 <h3 id="formNadpis" style="margin:0 0 10px">Kamera</h3>
@@ -52,20 +99,29 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}.
 
 <div class="karta filtry">
 <select id="fStav" onchange="vykresli(1)"><option value="ok">Stav: funkční (OK + pomalé)</option><option value="">Stav: vše</option>
-  <option value="mrtvá">nefunkční</option><option value="nic">neověřené</option><option value="skryta">skryté (3× v řadě)</option><option value="vyp">vypnuté</option></select>
+  <option value="mrtvá">nefunkční</option><option value="nic">neověřené</option><option value="skryta">skryté (3× v řadě)</option><option value="zmena">samo přepnuté</option><option value="oblibene">⭐ oblíbené</option><option value="vyp">vypnuté</option></select>
 <select id="fKat" onchange="vykresli(1)"></select>
 <select id="fZeme" onchange="vykresli(1)"></select>
 <select id="fTema" onchange="vykresli(1)"></select>
 <select id="fTyp" onchange="vykresli(1)"></select>
 <input id="fHledat" placeholder="Hledat v názvu…" oninput="clearTimeout(window._ht);window._ht=setTimeout(()=>vykresli(1),250)">
 <span id="fPocet" class="sed"></span>
+<div class="prepinac"><button id="vMriz" onclick="pohled('mriz')" title="Mřížka náhledů">🔲 Mřížka</button><button id="vTab" onclick="pohled('tab')" title="Tabulka">☰ Tabulka</button></div>
 </div>
-<div class="karta"><table><thead><tr><th>Náhled</th><th>Název</th><th class="skryt-m">Země / kategorie</th><th>Typ / mód</th><th>Stav</th><th class="skryt-m">Poslední úspěch</th><th class="skryt-m">Rozlišení</th><th>Akce</th></tr></thead>
-<tbody id="tab"></tbody></table><div id="strany" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap"></div></div>
+<div id="mrizBox"></div>
+<div class="karta" id="tabBox"><table><thead><tr><th>Náhled</th><th>Název</th><th class="skryt-m">Země / kategorie</th><th>Typ / mód</th><th>Stav</th><th class="skryt-m">Poslední úspěch</th><th class="skryt-m">Rozlišení</th><th>Akce</th></tr></thead>
+<tbody id="tab"></tbody></table></div>
+<div id="strany" style="margin:10px 0 30px;display:flex;gap:6px;flex-wrap:wrap"></div>
 </main>
+
+<div id="prehr" onclick="if(event.target===this)zavritPrehr()"><div class="okno">
+<div class="hl2"><b id="prehrNazev"></b><button class="btn" onclick="zavritPrehr()">✕ Zavřít</button></div>
+<div id="prehrObraz"></div><div id="prehrStav"></div></div></div>
+
 <script>
-let D = {}, puvodni = null;
-const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let D = {}, puvodni = null, KL = '', POHLED = 'mriz';
+try { POHLED = localStorage.getItem('webcams_pohled') || 'mriz'; } catch (e) {}
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(cesta, opt = {}) {
   const r = await fetch('api/' + cesta, Object.assign({headers: {'Content-Type': 'application/json'}}, opt));
   if (r.status === 401) { location.href = 'login'; throw 0; }
@@ -73,25 +129,57 @@ async function api(cesta, opt = {}) {
   if (!r.ok) throw new Error(d.detail || d.error || ('HTTP ' + r.status));
   return d;
 }
-const zemeN = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : (c.group || 'Ostatní');
+const vlajka = cc => cc && /^[A-Za-z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0))) : '🌐';
+const zemeN = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '';
+const vyska = s => { const m = /x(\d+)/.exec(s.resolution || ''); if (!m) return ''; const h = +m[1]; return h >= 2000 ? '4K' : h >= 1400 ? '1440p' : h >= 1000 ? '1080p' : h >= 700 ? '720p' : h + 'p'; };
+const typN = t => ({ytkanal: 'YouTube', ytdlp: 'YouTube', skyline: 'Skyline', feratel: 'Feratel', mjpeg: 'MJPEG', ipcamlive: 'IPCam', direct: 'm3u8', regex: 'web', auto: 'auto'}[t] || t);
+const nahled = c => `../thumb/${encodeURIComponent(c.id)}.jpg?k=${encodeURIComponent(KL)}&t=${Date.now() / 3600000 | 0}`;
+
 async function nacti() {
   D = await api('cams');
+  KL = Object.keys(D.odkazy).length ? new URL(D.odkazy.EPG).searchParams.get('k') : '';
   const sel = document.getElementById('f_country');
   if (!sel.options.length) sel.innerHTML = '<option value="">— bez země —</option>' +
     Object.entries(D.zeme).sort((a, b) => a[1].localeCompare(b[1], 'cs')).map(([k, n]) => `<option value="${k}">${esc(n)} (${k})</option>`).join('');
-  document.getElementById('odkazy').innerHTML = '<b>Odkazy pro přehrávače:</b><br>' +
-    Object.entries(D.odkazy).map(([n, u]) => `<a href="${esc(u)}" target="_blank">${esc(n)}</a>`).join('');
+  document.getElementById('odkazy').innerHTML = Object.entries(D.odkazy).map(([n, u], i) =>
+    `<div class="odk"><span>${esc(n)}</span><code title="${esc(u)}">${esc(u)}</code><button class="btn" onclick="kopiruj(${i},this)">Kopírovat</button></div>`).join('');
   const k = D.kontrola;
   document.getElementById('stavKontroly').textContent = k.active ? `kontrola běží ${k.done}/${k.total} · ` :
     (D.last_check ? 'poslední kontrola ' + D.last_check + ' · ' : '');
-  const kl = Object.keys(D.odkazy).length ? new URL(D.odkazy.EPG).searchParams.get('k') : '';
-  naplnFiltry();
+  document.getElementById('podtitul').textContent = D.cams.length + ' kamer';
+  dlazdice(); varovani(); naplnFiltry(); pohled(POHLED, true);
   vykresli(window._strana || 1);
   if (k.active) setTimeout(nacti, 4000);
 }
-const NA_STRANU = 100;
+function kopiruj(i, b) {
+  const u = Object.values(D.odkazy)[i];
+  (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => { b.textContent = '✔ Zkopírováno'; setTimeout(() => b.textContent = 'Kopírovat', 1500); },
+    () => prompt('Zkopíruj odkaz:', u));
+}
 const stavKamery = c => { const s = D.state[c.id] || {};
   if (!c.enabled) return 'vyp'; if ((s.fail_streak || 0) >= D.dead_after) return 'skryta'; return s.status || 'nic'; };
+function dlazdice() {
+  const n = {}; D.cams.forEach(c => { const s = stavKamery(c); n[s] = (n[s] || 0) + 1; });
+  const zm = Object.keys(D.zmeny || {}).length;
+  const d = [['', 'všechny', D.cams.length, ''], ['ok', 'funkční', (n.ok || 0) + (n['pomalá'] || 0), 'ok'], ['mrtvá', 'nefunkční', n['mrtvá'] || 0, 'mrtva'],
+             ['skryta', 'skryté', n.skryta || 0, 'skryta'], ['zmena', 'samo přepnuté', zm, 'zmena'], ['oblibene', '⭐ oblíbené', D.cams.filter(c => c.oblibena).length, 'obl'], ['nic', 'neověřené', n.nic || 0, ''], ['vyp', 'vypnuté', n.vyp || 0, 'vypnute']];
+  const akt = document.getElementById('fStav').value;
+  document.getElementById('dlazdice').innerHTML = d.map(([f, popis, pocet, tr]) =>
+    `<div class="dl ${tr}${akt === f ? ' akt' : ''}" onclick="filtrStav('${f}')"><b>${pocet}</b><span>${popis}</span></div>`).join('');
+}
+function filtrStav(f) { document.getElementById('fStav').value = f; vykresli(1); }
+function varovani() {
+  const skryte = D.cams.filter(c => c.enabled && ((D.state[c.id] || {}).fail_streak || 0) >= D.dead_after);
+  const jm = Object.fromEntries(D.cams.map(c => [c.id, c.name]));
+  const zm = Object.entries(D.zmeny || {});
+  let h = '';
+  if (skryte.length) h += `<div>⚠ <b>${skryte.length} kamer je skrytých</b> – ${D.dead_after} dny v řadě nejdou, v playlistu nejsou.
+    <button class="btn" onclick="filtrStav('skryta')">Ukázat je</button></div>`;
+  if (zm.length) h += `<div style="margin-top:8px">↻ <b>${zm.length} kamer se samo přepnulo na jiný přenos</b> (od spuštění služby) – zkontroluj je a uprav zdroj na kanál (typ ytkanal):<ul>` +
+    zm.map(([id, z]) => `<li><b>${esc(jm[id] || id)}</b> – ${esc(z.proc)} ${esc(z.kdy)}, hraje „${esc(z.nazev)}“ · <a href="${esc(z.kanal)}" target="_blank">kanál</a></li>`).join('') + '</ul></div>';
+  const el = document.getElementById('varovani');
+  el.innerHTML = h; el.style.display = h ? '' : 'none';
+}
 function moznosti(id, popis, hodnoty) {
   const el = document.getElementById(id), byla = el.value;
   const n = {}; hodnoty.forEach(h => n[h] = (n[h] || 0) + 1);
@@ -101,38 +189,60 @@ function moznosti(id, popis, hodnoty) {
 }
 function naplnFiltry() {
   moznosti('fKat', 'Kategorie', D.cams.map(c => c._kat));
-  moznosti('fZeme', 'Země', D.cams.map(c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : ''));
+  moznosti('fZeme', 'Země', D.cams.map(zemeN));
   moznosti('fTema', 'Zaměření', D.cams.map(c => c._tema));
   moznosti('fTyp', 'Typ', D.cams.map(c => c.type));
+}
+function pohled(p, tiše) {
+  POHLED = p === 'tab' ? 'tab' : 'mriz';
+  try { localStorage.setItem('webcams_pohled', POHLED); } catch (e) {}
+  document.getElementById('vMriz').classList.toggle('akt', POHLED === 'mriz');
+  document.getElementById('vTab').classList.toggle('akt', POHLED === 'tab');
+  document.getElementById('mrizBox').style.display = POHLED === 'mriz' ? '' : 'none';
+  document.getElementById('tabBox').style.display = POHLED === 'tab' ? '' : 'none';
+  if (!tiše) vykresli(window._strana || 1);
+}
+function karta(c) {
+  const s = D.state[c.id] || {}, st = stavKamery(c), v = vyska(s), id = esc(c.id);
+  const stTxt = {ok: 'funkční', 'pomalá': 'pomalá', 'mrtvá': 'nejde', nic: 'neověřeno', skryta: 'skrytá', vyp: 'vypnutá'}[st] || st;
+  return `<div class="kam${c.enabled ? '' : ' vyp'}">
+    <div class="obr" style="background-image:url('${nahled(c)}')" onclick="prehrat('${id}')" title="Přehrát">
+      <span class="tecka ${esc(st)}" title="${esc(stTxt)}"></span>
+      <button class="hvezda${c.oblibena ? ' on' : ''}" title="${c.oblibena ? 'Odebrat z oblíbených' : 'Přidat do oblíbených (skupina ⭐ Oblíbené nahoře v playlistu)'}" onclick="event.stopPropagation();oblibena('${id}')">${c.oblibena ? '★' : '☆'}</button>
+      <span class="stitky">${v ? `<span class="st-k">${v}</span>` : ''}<span class="st-k typ-${esc(c.type === 'auto' ? (s.type_used || 'auto') : c.type)}">${esc(typN(c.type === 'auto' ? (s.type_used || 'auto') : c.type))}</span></span></div>
+    <div class="popis"><b>${vlajka(c.country)} ${esc(c.name)}</b>
+      <div class="sed">${esc(stTxt)}${s.fail_streak ? ' · neúspěch ' + s.fail_streak + '×' : ''}${D.zmeny && D.zmeny[c.id] ? ' · ↻ samo přepnuto' : ''}${s.last_ok ? ' · OK ' + esc(s.last_ok.slice(5, 16)) : ''}</div>
+      ${s.error && st !== 'ok' ? `<div class="sed" title="${esc(s.error)}">${esc(s.error.slice(0, 70))}</div>` : ''}</div>
+    <div class="lista"><button title="Přehrát" onclick="prehrat('${id}')">▶</button><button title="Upravit" onclick="uprav('${id}')">✏️</button>
+      <button title="Otestovat teď" onclick="kontrola('${id}')">🔎</button><a class="btn" style="border:0;padding:5px 7px" title="Zdroj" href="${esc(c.source)}" target="_blank">🔗</a>
+      <button title="${c.enabled ? 'Vypnout' : 'Zapnout'}" onclick="prepni('${id}')">${c.enabled ? '🚫' : '✅'}</button><button title="Smazat" onclick="smaz('${id}')" style="margin-left:auto">🗑</button></div></div>`;
 }
 function radek(c) {
   const s = D.state[c.id] || {}, st = s.status || 'nic';
   const skryta = (s.fail_streak || 0) >= D.dead_after;
   return `<tr class="${c.enabled ? '' : 'vyp'}">
-      <td><img class="nah" src="../thumb/${esc(c.id)}.jpg?k=${encodeURIComponent(KL)}&t=${Date.now() / 3600000 | 0}" loading="lazy"></td>
-      <td><b>${esc(c.name)}</b><div class="sed">${esc(c.id)} · <a href="${esc(c.source)}" target="_blank">zdroj</a></div></td>
-      <td class="skryt-m">${esc(c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '—')}<div class="sed">${esc([c._tema, c.group !== 'Ostatní' ? c.group : ''].filter(Boolean).join(' · '))}</div></td>
+      <td><img class="nah" src="${nahled(c)}" loading="lazy" onclick="prehrat('${esc(c.id)}')" title="Přehrát"></td>
+      <td><b>${vlajka(c.country)} ${esc(c.name)}</b><div class="sed">${esc(c.id)} · <a href="${esc(c.source)}" target="_blank">zdroj</a></div></td>
+      <td class="skryt-m">${esc(zemeN(c) || '—')}<div class="sed">${esc([c._tema, c.group !== 'Ostatní' ? c.group : ''].filter(Boolean).join(' · '))}</div></td>
       <td>${esc(c.type === 'auto' ? 'auto → ' + (s.type_used || '?') : c.type)}<div class="sed">${esc(c.mode)}${s.force_proxy && c.mode === 'auto' ? ' → proxy' : ''}${Object.keys(c.headers || {}).length ? ' · hlavičky' : ''}${D.cache[c.id] ? ' · v cache ' + Math.round(D.cache[c.id].zbyva_s / 60) + ' min' : ''}</div></td>
       <td><span class="st ${esc(st)}">${st === 'nic' ? 'neověřeno' : esc(st)}</span>${skryta ? '<div class="sed">skrytá (' + s.fail_streak + '× v řadě)</div>' : (s.fail_streak ? '<div class="sed">neúspěch ' + s.fail_streak + '×</div>' : '')}
         ${s.error ? '<div class="sed" title="' + esc(s.error) + '">' + esc(s.error.slice(0, 60)) + '</div>' : ''}${c.note ? '<div class="sed">' + esc(c.note.slice(0, 70)) + '</div>' : ''}</td>
       <td class="skryt-m">${esc(s.last_ok || '—')}</td>
-      <td class="skryt-m">${esc(s.resolution || '—')}${s.fps ? ' · ' + s.fps + ' fps' : ''}${s.codec ? '<div class="sed">' + esc(s.codec) + '</div>' : ''}</td>
-      <td class="akce"><button class="btn" onclick="uprav('${esc(c.id)}')">✏️</button>
+      <td class="skryt-m">${esc(vyska(s) || s.resolution || '—')}${s.fps ? ' · ' + s.fps + ' fps' : ''}${s.codec ? '<div class="sed">' + esc(s.codec) + '</div>' : ''}</td>
+      <td class="akce"><button class="btn" title="Oblíbená" onclick="oblibena('${esc(c.id)}')" style="color:${c.oblibena ? '#d97706' : 'inherit'}">${c.oblibena ? '★' : '☆'}</button><button class="btn" onclick="prehrat('${esc(c.id)}')">▶</button><button class="btn" onclick="uprav('${esc(c.id)}')">✏️</button>
         <button class="btn" title="Otestovat teď" onclick="kontrola('${esc(c.id)}')">🔎</button>
         <button class="btn" onclick="prepni('${esc(c.id)}')">${c.enabled ? 'Vypnout' : 'Zapnout'}</button>
         <button class="btn" onclick="smaz('${esc(c.id)}')">🗑</button></td></tr>`;
 }
-let KL = '';
 function vykresli(strana) {
   window._strana = strana;
-  KL = Object.keys(D.odkazy).length ? new URL(D.odkazy.EPG).searchParams.get('k') : '';
   const f = id => document.getElementById(id).value, q = f('fHledat').toLowerCase();
-  const zn = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '';
+  const NA_STRANU = POHLED === 'mriz' ? 60 : 100;
   const vys = D.cams.filter(c => {
     const st = stavKamery(c);
-    if (f('fStav') === 'ok' ? !(st === 'ok' || st === 'pomalá') : (f('fStav') && st !== f('fStav'))) return false;
+    if (f('fStav') === 'ok' ? !(st === 'ok' || st === 'pomalá') : f('fStav') === 'zmena' ? !(D.zmeny && D.zmeny[c.id]) : f('fStav') === 'oblibene' ? !c.oblibena : (f('fStav') && st !== f('fStav'))) return false;
     if (f('fKat') && c._kat !== f('fKat')) return false;
-    if (f('fZeme') && zn(c) !== f('fZeme')) return false;
+    if (f('fZeme') && zemeN(c) !== f('fZeme')) return false;
     if (f('fTema') && c._tema !== f('fTema')) return false;
     if (f('fTyp') && c.type !== f('fTyp')) return false;
     if (q && !(c.name + ' ' + c.id).toLowerCase().includes(q)) return false;
@@ -143,19 +253,71 @@ function vykresli(strana) {
   const cast = vys.slice((strana - 1) * NA_STRANU, strana * NA_STRANU);
   const nKat = {}; vys.forEach(c => nKat[c._kat] = (nKat[c._kat] || 0) + 1);
   let posl = null, html = '';
-  for (const c of cast) {
-    if (c._kat !== posl) { posl = c._kat; html += `<tr class="skupina"><td colspan="8">${esc(posl)} <span class="sed">(${nKat[posl]})</span></td></tr>`; }
-    html += radek(c);
+  if (POHLED === 'mriz') {
+    for (const c of cast) {
+      if (c._kat !== posl) { html += (posl === null ? '' : '</div>') + `<div class="nadpis-skup">${esc(c._kat)} <span>(${nKat[c._kat]})</span></div><div class="mriz">`; posl = c._kat; }
+      html += karta(c);
+    }
+    document.getElementById('mrizBox').innerHTML = html ? html + '</div>' : '<div class="karta sed">Nic neodpovídá filtru.</div>';
+  } else {
+    for (const c of cast) {
+      if (c._kat !== posl) { posl = c._kat; html += `<tr class="skupina"><td colspan="8">${esc(posl)} <span class="sed">(${nKat[posl]})</span></td></tr>`; }
+      html += radek(c);
+    }
+    document.getElementById('tab').innerHTML = html || '<tr><td colspan="8" class="sed">Nic neodpovídá filtru.</td></tr>';
   }
-  document.getElementById('tab').innerHTML = html || '<tr><td colspan="8" class="sed">Nic neodpovídá filtru.</td></tr>';
-  const vse = D.cams.length, ok = D.cams.filter(c => ['ok', 'pomalá'].includes(stavKamery(c))).length;
-  document.getElementById('fPocet').textContent = `zobrazeno ${vys.length} z ${vse} · funkčních ${ok}`;
+  document.getElementById('fPocet').textContent = `zobrazeno ${vys.length} z ${D.cams.length}`;
+  dlazdice();
   let p = '';
   if (stran > 1) for (let i = 1; i <= stran; i++)
     if (i <= 3 || i > stran - 3 || Math.abs(i - strana) <= 2) p += `<button class="btn strana${i === strana ? ' akt' : ''}" onclick="vykresli(${i});scrollTo(0,0)">${i}</button>`;
     else if (!p.endsWith('… ')) p += '… ';
   document.getElementById('strany').innerHTML = p;
 }
+
+// ── přehrávač: /cam/{id}?client=web = vše přes službu (stejný klíč jako playlisty) ──
+let HLS = null, hlsNacitani = null;
+function nactiHls() {
+  if (window.Hls) return Promise.resolve();
+  return hlsNacitani || (hlsNacitani = new Promise((ok, chyba) => {
+    const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js';
+    s.onload = ok; s.onerror = () => { hlsNacitani = null; chyba(new Error('přehrávač hls.js se nenačetl')); }; document.head.appendChild(s);
+  }));
+}
+async function prehrat(id) {
+  const c = D.cams.find(x => x.id === id), s = D.state[id] || {};
+  const url = `../cam/${encodeURIComponent(id)}?client=web&k=${encodeURIComponent(KL)}`;
+  const box = document.getElementById('prehrObraz'), stav = document.getElementById('prehrStav');
+  document.getElementById('prehrNazev').textContent = vlajka(c.country) + ' ' + c.name;
+  document.getElementById('prehr').style.display = 'flex';
+  stav.textContent = 'Načítám… první spuštění může trvat i desítky sekund (zjištění adresy).';
+  if (c.type === 'mjpeg' || s.type_used === 'mjpeg') {
+    box.innerHTML = `<img src="${url}" alt="" onload="document.getElementById('prehrStav').textContent='MJPEG – živý obraz'" onerror="document.getElementById('prehrStav').textContent='Kamera teď nejde načíst.'">`;
+    return;
+  }
+  box.innerHTML = '<video controls autoplay muted playsinline></video>';
+  const v = box.querySelector('video');
+  const hraje = () => stav.textContent = `Hraje${v.videoHeight ? ' · ' + v.videoWidth + '×' + v.videoHeight : ''} · zvuk je ztlumený, zapneš ho v přehrávači`;
+  let posledni = 0;
+  v.addEventListener('playing', hraje);
+  v.addEventListener('timeupdate', () => { if (v.videoHeight !== posledni) { posledni = v.videoHeight; hraje(); } });   // kvalita se během prvních sekund zvedá
+  try {
+    if (v.canPlayType('application/vnd.apple.mpegurl') && !window.MediaSource) { v.src = url; return; }   // Safari na iPhonu
+    await nactiHls();
+    if (!Hls.isSupported()) { v.src = url; return; }
+    HLS = new Hls({lowLatencyMode: false, capLevelToPlayerSize: false});
+    HLS.on(Hls.Events.MANIFEST_PARSED, (e, d) => { HLS.startLevel = d.levels.length - 1; });   // náhled hned v nejvyšší kvalitě, níž jen při pomalé lince
+    HLS.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) stav.textContent = 'Kamera teď nejde přehrát (' + (d.response && d.response.code ? 'HTTP ' + d.response.code : d.details) + ').'; });
+    HLS.loadSource(url); HLS.attachMedia(v);
+  } catch (e) { stav.textContent = e.message || e; }
+}
+function zavritPrehr() {
+  if (HLS) { HLS.destroy(); HLS = null; }
+  document.getElementById('prehrObraz').innerHTML = '';
+  document.getElementById('prehr').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') zavritPrehr(); });
+
 const pole = ['source', 'id', 'name', 'group', 'country', 'category', 'type', 'mode', 'regex', 'match'];
 function vyplnit(c) {
   pole.forEach(p => document.getElementById('f_' + p).value = c[p] ?? (p === 'type' || p === 'mode' ? 'auto' : ''));
@@ -187,6 +349,11 @@ async function otestovat() {
 async function ulozit() {
   try { const d = formData(); d.puvodni_id = puvodni; await api('cams', {method: 'POST', body: JSON.stringify(d)}); zavrit(); nacti(); }
   catch (e) { alert(e.message || e); }
+}
+async function oblibena(id) {
+  await api('cams/' + encodeURIComponent(id) + '/oblibena', {method: 'POST'});
+  const c = D.cams.find(x => x.id === id); if (c) c.oblibena = !c.oblibena;   // bez načítání celého seznamu
+  vykresli(window._strana || 1);
 }
 async function prepni(id) { await api('cams/' + encodeURIComponent(id) + '/prepnout', {method: 'POST'}); nacti(); }
 async function smaz(id) { if (confirm('Smazat kameru ' + id + '?')) { await api('cams/' + encodeURIComponent(id), {method: 'DELETE'}); nacti(); } }

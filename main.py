@@ -45,6 +45,16 @@ _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
 log.addHandler(_h)
 
 app = FastAPI(title="Webcams proxy", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@app.middleware("http")
+async def cors_pro_prehravac(request: Request, call_next):
+    """přehrávač v administraci (hls.js) stahuje /cam, /proxy a /smycka – i když je administrace otevřená přes jinou adresu
+    než public_base (NAS přes Tailscale). Bez klíče ?k= tyto adresy stejně nic nevydají."""
+    r = await call_next(request)
+    if request.url.path.startswith(("/cam/", "/proxy/", "/smycka/")):
+        r.headers["Access-Control-Allow-Origin"] = "*"
+    return r
 CFG = store.config()
 
 
@@ -330,7 +340,9 @@ async def api_cams(request: Request):
     for c in cams:
         c["_kat"] = zeme.skupina(c, CFG, None, None, velke)
         c["_tema"] = zeme.tema(c)
+    ids = {c["id"] for c in cams}
     return {"cams": cams, "state": s["cams"], "cache": cache.snapshot(), "last_check": s["last_check"],
+            "zmeny": {k: v for k, v in resolver.zmeny.items() if k in ids},
             "kontrola": checker.running, "dead_after": CFG["dead_after"], "zeme": zeme.ZEME, "group_by": CFG["group_by"],
             "odkazy": {"Playlist Kodi": "%s/playlist.m3u?client=kodi&k=%s" % (b, k), "Playlist VLC": "%s/playlist.m3u?client=vlc&k=%s" % (b, k),
                        "Playlist Enigma2": "%s/playlist.m3u?client=e2&k=%s" % (b, k), "Bouquet Enigma2": "%s/bouquet.tv?k=%s" % (b, k),
@@ -352,15 +364,19 @@ def _cista_kamera(d):
     if not isinstance(c["headers"], dict):
         raise HTTPException(400, "headers musí být objekt")
     c["enabled"] = bool(c["enabled"])
+    c["oblibena"] = bool(c["oblibena"])
     return c
 
 
 @app.post("/admin/api/cams")
 async def api_ulozit(request: Request):
     need_admin(request)
-    c = _cista_kamera(await request.json())
+    d = await request.json()
+    c = _cista_kamera(d)
     lst = store.cams()
-    puvodni = (await request.json()).get("puvodni_id")
+    puvodni = d.get("puvodni_id")
+    if "oblibena" not in d:                     # formulář hvězdičku neposílá – zachovat
+        c["oblibena"] = any(x.get("oblibena") for x in lst if x["id"] in (c["id"], puvodni))
     lst = [x for x in lst if x["id"] not in (c["id"], puvodni)] + [c]
     store.save_cams(lst)
     cache.drop(c["id"])
@@ -406,6 +422,18 @@ async def api_prepnout(cid: str, request: Request):
     for x in lst:
         if x["id"] == cid:
             x["enabled"] = not x["enabled"]
+    store.save_cams(lst)
+    return {"ok": True}
+
+
+@app.post("/admin/api/cams/{cid}/oblibena")
+async def api_oblibena(cid: str, request: Request):
+    """hvězdička: kamera navíc ve skupině „⭐ Oblíbené“ nahoře v playlistech a bouquetu"""
+    need_admin(request)
+    lst = store.cams()
+    for x in lst:
+        if x["id"] == cid:
+            x["oblibena"] = not x.get("oblibena")
     store.save_cams(lst)
     return {"ok": True}
 

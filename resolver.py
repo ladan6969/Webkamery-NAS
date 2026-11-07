@@ -35,6 +35,21 @@ class ResolveError(Exception):
     pass
 
 
+class NeniZive(ResolveError):
+    """video YouTube už nevysílá; kanál a název z údajů videa → hledat nový přenos na stejném kanálu"""
+    def __init__(self, msg, kanal=None, nazev=None):
+        super().__init__(msg)
+        self.kanal, self.nazev = kanal, nazev
+
+
+# kamery, které se samy přepnuly na jiný přenos (od startu služby) – administrace je ukazuje jako varování
+# cid → {"kdy", "proc", "kanal", "nazev"}
+zmeny = {}
+_naucene = {}     # cid → (kanál, match) pro pevné video, které skončilo – příště rovnou kanál
+_SLOVA_PRYC = {"live", "stream", "livestream", "webcam", "webcams", "webkamera", "kamera", "camera", "cam", "cams", "online",
+               "hd", "uhd", "fhd", "now", "24h", "the", "and", "with", "from"}
+
+
 async def _direct(cfg, cam):
     src = cam["source"]
     text, final = await hls.fetch_text(cfg, src, cam.get("headers"))
@@ -63,7 +78,7 @@ async def _ytdlp(cfg, cam):
     if d.get("_type") == "playlist" and d.get("entries"):
         d = d["entries"][0]
     if d.get("is_live") is False or d.get("live_status") in ("was_live", "not_live", "post_live"):
-        raise ResolveError("yt-dlp: nevysílá živě")
+        raise NeniZive("yt-dlp: nevysílá živě", d.get("channel_url") or d.get("uploader_url"), d.get("title"))
     hlsf = [f for f in d.get("formats") or [] if "m3u8" in (f.get("protocol") or "")]
     if not hlsf:
         raise ResolveError("yt-dlp: žádný HLS formát")
@@ -184,9 +199,85 @@ async def _ytkanal(cfg, cam):
     """kanál YouTube + název přenosu (pole match): přežije restart přenosu s novým video_id i kanály s víc kamerami"""
     zive = await zive_kanalu(cfg, cam["source"])
     vhodne = [v for v in zive if _shoda(cam.get("match") or "", v[1])]
+    if not vhodne and len(zive) == 1:
+        # přenos přejmenovaný: kanál vysílá jediný živý přenos → ten (u kanálu s víc kamerami by šlo o hádání, proto jen jeden)
+        vhodne = zive
+        zmeny[cam.get("id") or "?"] = {"kdy": time.strftime("%Y-%m-%d %H:%M"), "proc": "název přenosu se změnil",
+                            "kanal": cam["source"], "nazev": zive[0][1]}
+        log.warning("cam %s: přenos „%s“ na kanálu není, beru jediný živý „%s“", cam.get("id"), cam.get("match"), zive[0][1])
+    elif vhodne and cam.get("type") == "ytkanal":
+        zmeny.pop(cam.get("id"), None)              # původní přenos zase sedí
     if not vhodne:
         raise ResolveError("ytkanal: na kanálu teď nevysílá přenos „%s“ (živých %d)" % (cam.get("match") or "*", len(zive)))
     return await _ytdlp(cfg, dict(cam, source="https://www.youtube.com/watch?v=" + vhodne[0][0]))
+
+
+async def _udaje_videa(cfg, url):
+    """kanál a název ze stránky videa – YouTube je uvádí i u ukončeného přenosu, který yt-dlp už nenačte"""
+    r = await hls.client(cfg).get(url, headers=hls.req_headers(cfg, {"Accept-Language": "cs"}))
+    m = re.search(r'"videoDetails":\{"videoId":"[\w-]{11}".{0,4000}?"title":"((?:[^"\\]|\\.)*)".{0,4000}?"channelId":"(UC[\w-]{22})"', r.text)
+    if not m:
+        m2 = re.search(r'"videoDetails":\{"videoId":"[\w-]{11}".{0,4000}?"channelId":"(UC[\w-]{22})".{0,4000}?"title":"((?:[^"\\]|\\.)*)"', r.text)
+        if not m2:
+            return None, None
+        return "https://www.youtube.com/channel/" + m2.group(1), json.loads('"%s"' % m2.group(2))
+    return "https://www.youtube.com/channel/" + m.group(2), json.loads('"%s"' % m.group(1))
+
+
+def _slova(t):
+    return {w.lower() for w in re.findall(r"[^\W\d_]{2,}", t or "")} - _SLOVA_PRYC   # i „SV“/„JZ“ (směr kamery)
+
+
+async def _novy_prenos(cfg, cam, kanal, nazev):
+    """nový živý přenos na kanálu místo ukončeného videa: jediný živý, nebo jednoznačně nejpodobnější název
+    (≥ 80 % slov; při shodě vyhraje název s méně slovy navíc; stále shoda = nehádat)"""
+    zive = await zive_kanalu(cfg, kanal)
+    if len(zive) == 1:
+        vybrany = zive[0]
+    else:
+        hledana = _slova(nazev)
+        skore = sorted(((len(hledana & _slova(t)) / max(1, len(hledana)), -len(_slova(t) - hledana), vid, t) for vid, t in zive), reverse=True)
+        if not skore or skore[0][0] < 0.8 or (len(skore) > 1 and skore[1][:2] == skore[0][:2]):
+            raise ResolveError("na kanálu nový přenos „%s“ není (živých %d)" % ((nazev or "?")[:60], len(zive)))
+        vybrany = skore[0][2:]
+    return await _ytdlp(cfg, dict(cam, source="https://www.youtube.com/watch?v=" + vybrany[0])), vybrany[1]
+
+
+async def _ytdlp_cam(cfg, cam):
+    """yt-dlp pro kameru; pevné video (watch?v=), které skončilo → nový přenos na stejném kanálu (provozovatel restartoval přenos)"""
+    cid = cam.get("id") or ""
+    if cid in _naucene:
+        kanal, nazev = _naucene[cid]
+        try:
+            return (await _novy_prenos(cfg, cam, kanal, nazev))[0]
+        except ResolveError:
+            pass                                   # třeba původní video zase vysílá
+    try:
+        url = await _ytdlp(cfg, cam)
+        _naucene.pop(cid, None)
+        zmeny.pop(cid, None)
+        return url
+    except ResolveError as e:
+        if "watch?v=" not in cam["source"]:
+            raise
+        kanal, nazev = (e.kanal, e.nazev) if isinstance(e, NeniZive) and e.kanal else (None, None)
+        if not kanal:
+            try:
+                kanal, nazev = await _udaje_videa(cfg, cam["source"])
+            except Exception:
+                kanal = None
+        if not kanal:
+            raise
+        try:
+            url, novy = await _novy_prenos(cfg, cam, kanal, nazev)
+        except ResolveError as e2:
+            raise ResolveError("%s; %s" % (e, e2))
+        if cid:
+            _naucene[cid] = (kanal, nazev)
+        zmeny[cid or "?"] = {"kdy": time.strftime("%Y-%m-%d %H:%M"), "proc": "původní video skončilo",
+                            "kanal": kanal, "nazev": novy}
+        log.warning("cam %s: video skončilo, hraje nový přenos „%s“ na kanálu %s", cid, novy, kanal)
+        return url
 
 
 async def _regex(cfg, cam):
@@ -199,7 +290,7 @@ async def _regex(cfg, cam):
     return m.group(1) if m.groups() else m.group(0)
 
 
-RESOLVERS = {"direct": _direct, "ytdlp": _ytdlp, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel,
+RESOLVERS = {"direct": _direct, "ytdlp": _ytdlp_cam, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel,
              "ipcamlive": _ipcamlive, "mjpeg": _mjpeg, "regex": _regex}
 NE_HLS = ("feratel", "mjpeg")          # výsledek není HLS playlist (smyčka klipu / MJPEG)
 

@@ -10,7 +10,10 @@ import store
 import zeme
 
 
-def _viditelne(cfg, podle=None, cz=None):
+OBLIBENE = "⭐ Oblíbené"
+
+
+def _viditelne(cfg, podle=None, cz=None, oblibene=False):
     s = store.state()
     vid = [c for c in store.cams() if c["enabled"] and checker.visible(s["cams"].get(c["id"]), cfg)]
     pocty = {}
@@ -20,8 +23,11 @@ def _viditelne(cfg, podle=None, cz=None):
     velke = {k for k, n in pocty.items() if k and n > cfg.get("velka_zeme", zeme.VELKA_ZEME)}
     out = [dict(c, kategorie=zeme.skupina(c, cfg, podle, cz, velke)) for c in vid]
     # domácí země (Česko) nahoře, pak abecedně
-    return sorted(out, key=lambda c: (not c["kategorie"].startswith(tuple(zeme.nazev(k) for k in zeme.DOMACI)),
-                                      c["kategorie"].lower(), c["name"].lower())), s
+    out = sorted(out, key=lambda c: (not c["kategorie"].startswith(tuple(zeme.nazev(k) for k in zeme.DOMACI)),
+                                     c["kategorie"].lower(), c["name"].lower()))
+    if oblibene:          # oblíbené navíc nahoře (kamera zůstává i ve své kategorii); EPG je nepotřebuje
+        out = [dict(c, kategorie=OBLIBENE) for c in sorted(out, key=lambda c: c["name"].lower()) if c.get("oblibena")] + out
+    return out, s
 
 
 def cam_url(cfg, cid, client, key):
@@ -36,11 +42,13 @@ def mode_for(cam, client, st=None):
         m = "proxy" if cam.get("headers") or (st or {}).get("force_proxy") else "redirect"
     if client == "e2" and cam.get("headers"):
         m = "proxy"
+    if client == "web":                     # přehrávač v administraci: vše přes službu (CORS, hlavičky zdroje)
+        m = "proxy"
     return m
 
 
 def m3u(cfg, client, key, podle=None, cz=None):
-    cams, s = _viditelne(cfg, podle, cz)
+    cams, s = _viditelne(cfg, podle, cz, oblibene=True)
     b = cfg["public_base"]
     out = ['#EXTM3U url-tvg="%s/epg.xml?k=%s"' % (b, quote(key))]
     for c in cams:
@@ -58,7 +66,7 @@ def m3u(cfg, client, key, podle=None, cz=None):
 
 
 def bouquet(cfg, key, podle=None, cz=None):
-    cams, s = _viditelne(cfg, podle, cz)
+    cams, s = _viditelne(cfg, podle, cz, oblibene=True)
     out = ["#NAME Webkamery"]
     skupina, n = None, 0
     zmena = False
