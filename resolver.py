@@ -68,7 +68,7 @@ async def _ytdlp(cfg, cam):
     if not hlsf:
         raise ResolveError("yt-dlp: žádný HLS formát")
     best = max(hlsf, key=lambda f: ((f.get("height") or 0), (f.get("tbr") or 0)))
-    # master (manifest_url) – Kodi si vybere sám, pro Enigmu se zkrátí na nejvyšší variantu
+    # master (manifest_url) – pro Kodi a Enigmu se zkrátí na nejvyšší variantu, VLC dostane celý
     return best.get("manifest_url") or best["url"]
 
 

@@ -68,7 +68,8 @@ def _vykon(attrs):
         w, h = (int(x) for x in res.lower().split("x"))
     except ValueError:
         w = h = 0
-    return (w * h, int(attrs.get("BANDWIDTH", "0") or 0))
+    avc = attrs.get("CODECS", "").startswith("avc1") or ",avc1" in attrs.get("CODECS", "")   # při stejném rozlišení přednost H.264
+    return (w * h, avc, int(attrs.get("BANDWIDTH", "0") or 0))
 
 
 def best_variant(text):

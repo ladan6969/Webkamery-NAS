@@ -219,7 +219,18 @@ venv/bin/python tools/doplnit_kamery.py --instalovat
 
 ## 11. Aktualizace a odinstalace
 
-**Aktualizace:** stáhni a rozbal nový ZIP podle kroku 3 a znovu spusť krok 4. Nastavení, klíče, heslo, kamery a stav kontrol zůstanou. Seznam kamer z nového ZIPu se tím nepřepíše.
+**Automatická aktualizace kódu (OTA):** nová instalace ji má zapnutou. Starší instalaci zapneš jednou v Plánovači úloh jako root:
+
+```sh
+cd /volume1/webcams || exit 1
+U=https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main
+curl -fsSL $U/tools/aktualizuj_kod.py -o tools/aktualizuj_kod.py || exit 1
+venv/bin/python tools/aktualizuj_kod.py --instalovat
+```
+
+Pak se NAS každý den ve 4:00 podívá na soubor `VERZE` na GitHubu. Kód stáhne jen při změně verze, po restartu ověří, že služba běží s novou verzí, a jinak vrátí předchozí kód. Nastavení, klíče, heslo a kamery se nemění. Výpis je v `logs/aktualizace.log`. Autor vydá novou verzi tak, že změní soubor `VERZE`.
+
+**Ruční aktualizace:** stáhni a rozbal nový ZIP podle kroku 3 a znovu spusť krok 4. Nastavení, klíče, heslo, kamery a stav kontrol zůstanou. Seznam kamer z nového ZIPu se tím nepřepíše.
 
 **Odinstalace jako root:**
 

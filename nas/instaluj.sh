@@ -86,7 +86,7 @@ echo "== 2) soubory do $DEST"
 mkdir -p "$DEST/logs" "$DEST/thumbs" "$DEST/static" "$DEST/tools" || exit 1
 [ -f "$DEST/webcams.pid" ] && kill "$(cat "$DEST/webcams.pid")" 2>/dev/null && sleep 2
 [ -n "$STARA" ] && [ "$(readlink "/proc/$STARA/cwd")" = "$DEST" ] && kill "$STARA" 2>/dev/null && sleep 2
-cp -f "$BALIK"/kod/*.py "$BALIK"/kod/requirements-nas.txt "$DEST/" && cp -f "$BALIK"/kod/static/* "$DEST/static/" \
+cp -f "$BALIK"/kod/*.py "$BALIK"/kod/VERZE "$BALIK"/kod/requirements-nas.txt "$DEST/" && cp -f "$BALIK"/kod/static/* "$DEST/static/" \
   && cp -f "$BALIK"/kod/tools/* "$DEST/tools/" 2>/dev/null; ok "kód"
 for f in config.json cams.json state.json; do
   if [ -f "$DEST/$f" ]; then ok "$f – ponechán stávající"
@@ -216,6 +216,8 @@ if [ -f /etc/crontab ] && ! grep -q "webcams.sh kontrola" /etc/crontab; then
 fi
 
 "$DEST/venv/bin/python" "$DEST/tools/doplnit_kamery.py" --instalovat "$DEST" 2>&1 | sed 's/^/  ✓ /' || true
+# OTA kódu z GitHubu: jen zapsat do plánu, samotná aktualizace až z plánu (tady je právě nainstalovaný kód)
+WEBCAMS_OTA_JEN_PLAN=1 "$DEST/venv/bin/python" "$DEST/tools/aktualizuj_kod.py" --instalovat "$DEST" 2>&1 | sed 's/^/  ✓ /' || true
 
 if [ -z "$BEZ_STARTU" ]; then
   "$DEST/webcams.sh" restart >/dev/null; sleep 6

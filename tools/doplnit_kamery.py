@@ -4,7 +4,7 @@ Zapnutí na NASu (jednou, jako root, např. v Plánovači úloh):
   curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/doplnit_kamery.py -o /volume1/webcams/tools/doplnit_kamery.py && /volume1/webcams/venv/bin/python /volume1/webcams/tools/doplnit_kamery.py --instalovat
 
 Pak běží každý den ve 4:30 (před kontrolou ve 4:45), výpis je v logs/doplnit.log. Ručně: bez --instalovat.
-Z GitHubu se denně stahuje jen seznam kamer (data), kód se sám nemění.
+Tento skript stahuje jen seznam kamer (data); kód aktualizuje tools/aktualizuj_kod.py.
 Kamera se přidá jen jednou: kameru, kterou smažeš, automatika nevrátí (kamery_nabidnute.json). Vlastní kamery a úpravy zůstanou.
 Jiná složka instalace: argument /cesta.
 """

@@ -32,6 +32,10 @@ import store
 import zeme
 
 VERZE = "1.0.0"
+try:                                            # verze nasazeného kódu pro OTA (tools/aktualizuj_kod.py); na VPS soubor není
+    KOD_VERZE = open(os.path.join(store.BASE, "VERZE"), encoding="utf-8").read().strip()
+except OSError:
+    KOD_VERZE = None
 MPEGURL = "application/vnd.apple.mpegurl"
 os.makedirs(store.path("logs"), exist_ok=True)
 log = logging.getLogger("webcams")
@@ -153,7 +157,7 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi"):
             return PlainTextResponse("Kamera %s: klip nejde připravit (%s)" % (cam["name"], ex), 503)
         return Response(smycka.playlist(CFG, cid, st, key), media_type=MPEGURL, headers={"Cache-Control": "no-store"})
     mode = playlist.mode_for(cam, client, store.state()["cams"].get(cid))
-    if mode == "redirect" and client != "e2":
+    if mode == "redirect" and client not in ("e2", "kodi"):
         return RedirectResponse(e["url"], 302)
     try:
         text, base = await hls.fetch_text(CFG, e["url"], cam.get("headers"))
@@ -161,7 +165,9 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi"):
         cache.drop(cid)
         log.warning("cam %s: playlist %s", cid, ex)
         return PlainTextResponse("Kamera %s: playlist nejde stáhnout (%s)" % (cam["name"], ex.__class__.__name__), 503)
-    if client == "e2":                          # Enigma2: jen nejvyšší varianta, absolutní URI
+    if client == "kodi" and mode == "redirect" and not hls.is_master(text):   # jediná kvalita – není co vybírat, Kodi jde rovnou na zdroj
+        return RedirectResponse(e["url"], 302)
+    if client in ("e2", "kodi"):                # jen nejvyšší varianta, absolutní URI
         text = hls.reduce_master(text, base) if hls.is_master(text) else hls.absolutize(text, base)
         base = None
     if mode == "proxy":
@@ -261,7 +267,7 @@ async def health():
     zap = [c for c in cams if c["enabled"]]
     ok = sum(1 for c in zap if s["cams"].get(c["id"], {}).get("status") in ("ok", "pomalá"))
     skryte = sum(1 for c in zap if not checker.visible(s["cams"].get(c["id"]), CFG))
-    return {"verze": VERZE, "kamer": len(cams), "zapnutych": len(zap), "ok": ok, "skrytych_mrtvych": skryte,
+    return {"verze": VERZE, "kod": KOD_VERZE, "kamer": len(cams), "zapnutych": len(zap), "ok": ok, "skrytych_mrtvych": skryte,
             "yt_dlp": await resolver.ytdlp_version(), "posledni_kontrola": s["last_check"],
             "kontrola_bezi": checker.running["active"], "v_cache": len(cache.snapshot())}
 
