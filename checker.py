@@ -183,8 +183,12 @@ async def probe(cfg, cam, thumb_dest=None, live_wait=None):
 
 
 def visible(st_cam, cfg):
-    """kamera v playlistu / bouquetu / EPG: zapnutá a ne „skrytá“ po N neúspěšných dnech"""
-    return (st_cam or {}).get("fail_streak", 0) < cfg["dead_after"]
+    """kamera v playlistu / bouquetu / EPG: zapnutá a ne „skrytá“ po N neúspěšných dnech;
+    kamera, která ještě nikdy nehrála (nová, provozovatel ji teprve chystá), se skryje už po první neúspěšné kontrole (7. 11. 2026)"""
+    st_cam = st_cam or {}
+    if not st_cam.get("last_ok") and st_cam.get("fail_streak", 0) >= 1:
+        return False
+    return st_cam.get("fail_streak", 0) < cfg["dead_after"]
 
 
 async def check_all(cfg, only=None):
