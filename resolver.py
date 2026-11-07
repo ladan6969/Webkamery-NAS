@@ -243,9 +243,34 @@ async def _novy_prenos(cfg, cam, kanal, nazev):
     return await _ytdlp(cfg, dict(cam, source="https://www.youtube.com/watch?v=" + vybrany[0])), vybrany[1]
 
 
+_YT_ID_RE = re.compile(r"(?:youtube(?:-nocookie)?\.com/(?:embed/|watch\?v=|live/)|youtu\.be/)([A-Za-z0-9_-]{11})")
+_ze_stranky = {}                 # id kamery → aktuální watch URL ze stránky provozovatele (pole page)
+
+
+async def _video_ze_stranky(cfg, cam):
+    """aktuální video YouTube ze stránky provozovatele (pole page, ne YouTube) – pro kanály, jejichž přenosy nejsou veřejně
+    v seznamu (např. kamery.wia.cz); jiné video než to, které skončilo → watch URL, jinak None"""
+    page = cam.get("page") or ""
+    if not page.startswith(("http://", "https://")) or "youtube." in page or "youtu.be" in page:
+        return None
+    r = await hls.client(cfg).get(page, headers=hls.req_headers(cfg, cam.get("headers")))
+    r.raise_for_status()
+    stare = _YT_ID_RE.search(cam["source"])
+    for m in _YT_ID_RE.finditer(r.text.replace("\\/", "/")):
+        if not stare or m.group(1) != stare.group(1):
+            return "https://www.youtube.com/watch?v=" + m.group(1)
+    return None
+
+
 async def _ytdlp_cam(cfg, cam):
-    """yt-dlp pro kameru; pevné video (watch?v=), které skončilo → nový přenos na stejném kanálu (provozovatel restartoval přenos)"""
+    """yt-dlp pro kameru; pevné video (watch?v=), které skončilo → nové video ze stránky provozovatele (pole page),
+    jinak nový přenos na stejném kanálu (provozovatel restartoval přenos)"""
     cid = cam.get("id") or ""
+    if cid in _ze_stranky:
+        try:
+            return await _ytdlp(cfg, dict(cam, source=_ze_stranky[cid]))
+        except ResolveError:
+            _ze_stranky.pop(cid, None)             # i nové video skončilo – zkusit znovu od začátku
     if cid in _naucene:
         kanal, nazev = _naucene[cid]
         try:
@@ -260,6 +285,22 @@ async def _ytdlp_cam(cfg, cam):
     except ResolveError as e:
         if "watch?v=" not in cam["source"]:
             raise
+        try:
+            nove = await _video_ze_stranky(cfg, cam)
+        except Exception as e3:
+            log.info("cam %s: stránka %s: %s", cid, cam.get("page"), e3)
+            nove = None
+        if nove:
+            try:
+                url = await _ytdlp(cfg, dict(cam, source=nove))
+                if cid:
+                    _ze_stranky[cid] = nove
+                zmeny[cid or "?"] = {"kdy": time.strftime("%Y-%m-%d %H:%M"), "proc": "původní video skončilo, nové ze stránky kamery",
+                                    "kanal": cam.get("page"), "nazev": nove}
+                log.warning("cam %s: video skončilo, hraje nové ze stránky %s: %s", cid, cam.get("page"), nove)
+                return url
+            except ResolveError:
+                pass
         kanal, nazev = (e.kanal, e.nazev) if isinstance(e, NeniZive) and e.kanal else (None, None)
         if not kanal:
             try:
