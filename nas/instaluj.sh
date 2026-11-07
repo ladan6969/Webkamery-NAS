@@ -70,7 +70,10 @@ fi
 
 # port
 if (netstat -tln 2>/dev/null || ss -tln 2>/dev/null) | grep -q ":$PORT "; then
-  if [ -f "$DEST/webcams.pid" ] && kill -0 "$(cat "$DEST/webcams.pid")" 2>/dev/null; then ok "port $PORT drží předchozí instalace (bude restartována)"
+  # naše služba podle procesu na portu (6. 11. 2026: starý .pid ukazoval na pomocný proces, služba běžela dál)
+  STARA=$(netstat -tlnp 2>/dev/null | awk -v p=":$PORT\$" '$4 ~ p {split($7,a,"/"); print a[1]; exit}')
+  if [ -n "$STARA" ] && [ "$(readlink "/proc/$STARA/cwd")" = "$DEST" ]; then ok "port $PORT drží předchozí instalace (bude restartována)"
+  elif [ -f "$DEST/webcams.pid" ] && kill -0 "$(cat "$DEST/webcams.pid")" 2>/dev/null; then ok "port $PORT drží předchozí instalace (bude restartována)"
   else chyba "port $PORT je obsazený jinou službou – spusťte s PORT=… (např. PORT=8094)"; fi
 else ok "port $PORT volný"; fi
 
@@ -82,6 +85,7 @@ fi
 echo "== 2) soubory do $DEST"
 mkdir -p "$DEST/logs" "$DEST/thumbs" "$DEST/static" "$DEST/tools" || exit 1
 [ -f "$DEST/webcams.pid" ] && kill "$(cat "$DEST/webcams.pid")" 2>/dev/null && sleep 2
+[ -n "$STARA" ] && [ "$(readlink "/proc/$STARA/cwd")" = "$DEST" ] && kill "$STARA" 2>/dev/null && sleep 2
 cp -f "$BALIK"/kod/*.py "$BALIK"/kod/requirements-nas.txt "$DEST/" && cp -f "$BALIK"/kod/static/* "$DEST/static/" \
   && cp -f "$BALIK"/kod/tools/* "$DEST/tools/" 2>/dev/null; ok "kód"
 for f in config.json cams.json state.json; do
@@ -188,8 +192,10 @@ cat > "$DEST/webcams.sh" <<EOF
 D=$DEST; export PATH=$(dirname "$FF"):\$PATH HOME=$DEST PYTHONUNBUFFERED=1
 case "\$1" in
   start)   [ -f \$D/webcams.pid ] && kill -0 \$(cat \$D/webcams.pid) 2>/dev/null && { echo "už běží"; exit 0; }
-           cd \$D && nohup venv/bin/python main.py >> logs/webcams.log 2>&1 & echo \$! > \$D/webcams.pid; echo "spuštěno" ;;
-  stop)    [ -f \$D/webcams.pid ] && kill \$(cat \$D/webcams.pid) 2>/dev/null; rm -f \$D/webcams.pid; echo "zastaveno" ;;
+           cd \$D || exit 1; nohup venv/bin/python main.py >> logs/webcams.log 2>&1 & echo \$! > \$D/webcams.pid; echo "spuštěno" ;;
+  stop)    [ -f \$D/webcams.pid ] && kill \$(cat \$D/webcams.pid) 2>/dev/null; rm -f \$D/webcams.pid
+           # služba spuštěná starším skriptem (v .pid byl pomocný proces): najít podle portu a cesty
+           for p in \$(netstat -tlnp 2>/dev/null | awk '\$4 ~ /:$PORT\$/ {split(\$7,a,"/"); print a[1]}'); do [ "\$(readlink /proc/\$p/cwd)" = "\$D" ] && kill \$p; done; echo "zastaveno" ;;
   restart) \$0 stop; sleep 2; \$0 start ;;
   status)  [ -f \$D/webcams.pid ] && kill -0 \$(cat \$D/webcams.pid) 2>/dev/null && echo "běží (pid \$(cat \$D/webcams.pid))" || echo "neběží" ;;
   kontrola) curl -s -m 30 -X POST -H "X-Webcams-Token: \$(\$D/venv/bin/python -c 'import json;print(json.load(open("'\$D'/config.json"))["cron_token"])')" http://127.0.0.1:$PORT/admin/api/check >> \$D/logs/cron.log 2>&1 ;;
