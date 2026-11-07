@@ -191,11 +191,27 @@ def visible(st_cam, cfg):
     return st_cam.get("fail_streak", 0) < cfg["dead_after"]
 
 
+def _jen_tydne(st_cam, cfg):
+    """nevysílající kamera: první týden se zkouší každou noc, pak jednou týdně (7. 11. 2026) – True = dnes přeskočit"""
+    st_cam = st_cam or {}
+    po = int(cfg.get("dead_weekly_after", 7))
+    if not po or visible(st_cam, cfg) or st_cam.get("fail_streak", 0) < po:
+        return False
+    try:
+        posledni = time.mktime(time.strptime(st_cam.get("last_check") or "", "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        return False
+    return time.time() - posledni < 6.5 * 86400
+
+
 async def check_all(cfg, only=None):
     """Kontrola všech (nebo jedné) zapnutých kamer. → souhrn"""
     if running["active"]:
         return {"error": "kontrola už běží"}
     cams = [c for c in store.cams() if (only is None and c["enabled"]) or c["id"] == only]
+    if only is None:
+        st = store.state()["cams"]                 # jednou – ne pro každou kameru (7. 11. 2026: 7 000× načtení zablokovalo službu)
+        cams = [c for c in cams if not _jen_tydne(st.get(c["id"]), cfg)]
     cams.sort(key=lambda c: (c.get("type") != "ytkanal", c.get("source")))      # kamery jednoho kanálu za sebou → jeden výpis kanálu
     running.update(active=True, done=0, total=len(cams), started=time.time())
     zmeny = {"nove_mrtve": [], "ozivene": []}

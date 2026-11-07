@@ -35,6 +35,7 @@ CONFIG_DEFAULT = {
     "check_live_wait": 10,        # čekání na posun MEDIA-SEQUENCE
     "slow_threshold": 10,         # resolve + start nad 10 s = pomalá
     "dead_after": 3,              # po 3 neúspěšných denních kontrolách v řadě skrýt
+    "dead_weekly_after": 7,       # skrytá kamera, která nejde 7 dní, se dál zkouší jen jednou týdně (0 = každou noc)
     "thumbs_dir": "thumbs",
     "epg_tz": "Europe/Prague",
     "group_by": "country",        # kategorie playlistu: country (podle země) | group (volná skupina)
