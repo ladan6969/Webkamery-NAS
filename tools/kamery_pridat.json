@@ -2497,7 +2497,7 @@
  },
  {
   "id": "wia-as",
-  "name": "Aš",
+  "name": "Aš – Hedvábnická",
   "group": "Karlovarský kraj",
   "country": "CZ",
   "category": "město",
@@ -2512,7 +2512,7 @@
  },
  {
   "id": "wia-bohusovice-nad-ohri",
-  "name": "Bohušovice nad Ohří",
+  "name": "Bohušovice nad Ohří – Zahradní",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
@@ -2527,7 +2527,7 @@
  },
  {
   "id": "wia-brandys-nad-labem",
-  "name": "Brandýs nad Labem",
+  "name": "Brandýs nad Labem – Kralupská",
   "group": "Středočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -2542,7 +2542,7 @@
  },
  {
   "id": "wia-caslav",
-  "name": "Čáslav",
+  "name": "Čáslav – Rudolfa Těsnohlídka",
   "group": "Středočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -2572,7 +2572,7 @@
  },
  {
   "id": "wia-frantiskovy-lazne",
-  "name": "Františkovy Lázně",
+  "name": "Františkovy Lázně – Táborská",
   "group": "Karlovarský kraj",
   "country": "CZ",
   "category": "město",
@@ -2587,7 +2587,7 @@
  },
  {
   "id": "wia-hodonin",
-  "name": "Hodonín",
+  "name": "Hodonín – třída Dukelských hrdinů",
   "group": "Jihomoravský kraj",
   "country": "CZ",
   "category": "město",
@@ -2602,7 +2602,7 @@
  },
  {
   "id": "wia-hradec-kralove",
-  "name": "Hradec Králové",
+  "name": "Hradec Králové – třída SNP",
   "group": "Královéhradecký kraj",
   "country": "CZ",
   "category": "město",
@@ -2692,7 +2692,7 @@
  },
  {
   "id": "wia-karlovy-vary",
-  "name": "Karlovy Vary",
+  "name": "Karlovy Vary – Krušnohorská",
   "group": "Karlovarský kraj",
   "country": "CZ",
   "category": "město",
@@ -2707,7 +2707,7 @@
  },
  {
   "id": "wia-kladno-2",
-  "name": "Kladno – Kožová Hora",
+  "name": "Kladno – Pletený Újezd",
   "group": "Středočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -2722,7 +2722,7 @@
  },
  {
   "id": "wia-kovoterm-brno",
-  "name": "Brno – Kovoterm",
+  "name": "Brno – Cejl",
   "group": "Jihomoravský kraj",
   "country": "CZ",
   "category": "město",
@@ -2737,7 +2737,7 @@
  },
  {
   "id": "wia-lazne-kynzvart",
-  "name": "Lázně Kynžvart",
+  "name": "Lázně Kynžvart – Náměstí Republiky",
   "group": "Karlovarský kraj",
   "country": "CZ",
   "category": "město",
@@ -2767,7 +2767,7 @@
  },
  {
   "id": "wia-litomerice",
-  "name": "Litoměřice",
+  "name": "Litoměřice – Dukelská",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
@@ -2782,7 +2782,7 @@
  },
  {
   "id": "wia-luby",
-  "name": "Luby",
+  "name": "Luby – Masarykova",
   "group": "Karlovarský kraj",
   "country": "CZ",
   "category": "město",
@@ -2797,7 +2797,7 @@
  },
  {
   "id": "wia-marianske-lazne",
-  "name": "Mariánské Lázně",
+  "name": "Mariánské Lázně – Mánesova",
   "group": "Karlovarský kraj",
   "country": "CZ",
   "category": "město",
@@ -2827,7 +2827,7 @@
  },
  {
   "id": "wia-olomouc",
-  "name": "Olomouc",
+  "name": "Olomouc – Foerstrova",
   "group": "Olomoucký kraj",
   "country": "CZ",
   "category": "město",
@@ -2842,7 +2842,7 @@
  },
  {
   "id": "wia-pisek",
-  "name": "Písek",
+  "name": "Písek – Otavská",
   "group": "Jihočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -2857,7 +2857,7 @@
  },
  {
   "id": "wia-plzen-3",
-  "name": "Plzeň",
+  "name": "Plzeň – Na Pomezí",
   "group": "Plzeňský kraj",
   "country": "CZ",
   "category": "město",
@@ -2872,7 +2872,7 @@
  },
  {
   "id": "wia-praha-10",
-  "name": "Praha – Lhotka",
+  "name": "Praha – Kamýk, Ve Lhotce",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -2887,7 +2887,7 @@
  },
  {
   "id": "wia-praha-12",
-  "name": "Praha – Strahov",
+  "name": "Praha 6 – Vaníčkova",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -2902,7 +2902,7 @@
  },
  {
   "id": "wia-praha-3",
-  "name": "Praha – Hvězdova",
+  "name": "Praha – Nusle, Hvězdova",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -2917,7 +2917,7 @@
  },
  {
   "id": "wia-praha-6",
-  "name": "Praha – Akropolis",
+  "name": "Praha – Žižkov, Kubelíkova",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -2932,7 +2932,7 @@
  },
  {
   "id": "wia-roudnice-nad-labem",
-  "name": "Roudnice nad Labem",
+  "name": "Roudnice nad Labem – Alej 17. listopadu",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
@@ -2962,7 +2962,7 @@
  },
  {
   "id": "wia-ustek-2",
-  "name": "Úštěk – náměstí",
+  "name": "Úštěk – Mírové náměstí",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
@@ -2992,7 +2992,7 @@
  },
  {
   "id": "wia-hostka",
-  "name": "Hoštka",
+  "name": "Hoštka – Bodláková",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
@@ -3037,7 +3037,7 @@
  },
  {
   "id": "wia-kutna-hora",
-  "name": "Kutná Hora",
+  "name": "Kutná Hora – Havlíčkovo náměstí",
   "group": "Středočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -3052,7 +3052,7 @@
  },
  {
   "id": "wia-lovosice",
-  "name": "Lovosice",
+  "name": "Lovosice – Vodní",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
@@ -3112,7 +3112,7 @@
  },
  {
   "id": "wia-praha-2",
-  "name": "Praha – Střížkov",
+  "name": "Praha – Střížkov, Černého",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -3142,7 +3142,7 @@
  },
  {
   "id": "wia-praha-5",
-  "name": "Praha – Záběhlice",
+  "name": "Praha – Záběhlice, Jahodová",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -3157,7 +3157,7 @@
  },
  {
   "id": "wia-praha-7",
-  "name": "Praha – Horní Měcholupy",
+  "name": "Praha – Horní Měcholupy, Nad přehradou",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -3172,7 +3172,7 @@
  },
  {
   "id": "wia-praha-8",
-  "name": "Praha – Troja",
+  "name": "Praha – Troja, Písečná",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -3187,7 +3187,7 @@
  },
  {
   "id": "wia-praha-9",
-  "name": "Praha – Strašnice",
+  "name": "Praha – Strašnice, Pod strání",
   "group": "Praha",
   "country": "CZ",
   "category": "město",
@@ -3202,7 +3202,7 @@
  },
  {
   "id": "wia-ricany",
-  "name": "Říčany",
+  "name": "Říčany – Plynární",
   "group": "Středočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -3247,7 +3247,7 @@
  },
  {
   "id": "wia-tabor",
-  "name": "Tábor",
+  "name": "Tábor – Angela Kančeva",
   "group": "Jihočeský kraj",
   "country": "CZ",
   "category": "město",
@@ -3292,7 +3292,7 @@
  },
  {
   "id": "wia-vrbice",
-  "name": "Vrbice",
+  "name": "Vrbice – U Školy",
   "group": "Ústecký kraj",
   "country": "CZ",
   "category": "město",
