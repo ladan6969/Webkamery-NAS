@@ -42,7 +42,7 @@ details.odkazy summary{cursor:pointer;font-weight:600;list-style:none}details.od
 .tecka.ok{background:var(--ok)}.tecka.pomalá{background:var(--pomala)}.tecka.mrtvá{background:var(--mrtva)}.tecka.nic{background:var(--nic)}.tecka.skryta{background:#7c3aed}.tecka.vyp{background:#cbd2d9}
 .stitky{position:absolute;top:7px;right:7px;display:flex;gap:4px}
 .st-k{font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:5px;color:#fff;background:rgba(15,23,42,.65)}
-.typ-ytkanal,.typ-ytdlp{background:#dc2626}.typ-skyline{background:#2563eb}.typ-feratel{background:#16a34a}.typ-mjpeg,.typ-ipcamlive{background:#9333ea}.typ-direct,.typ-regex,.typ-auto{background:#475569}
+.typ-ytkanal,.typ-ytdlp{background:#dc2626}.typ-skyline{background:#2563eb}.typ-feratel{background:#16a34a}.typ-mjpeg,.typ-ipcamlive{background:#9333ea}.typ-direct,.typ-regex,.typ-auto{background:#475569}.typ-snimek{background:#0891b2}
 .popis{padding:9px 11px 6px;flex:1}.popis b{display:block;line-height:1.25}.popis .sed{margin-top:3px}
 .lista{display:flex;gap:2px;padding:4px 6px 8px;border-top:1px solid var(--linka)}.lista button{border:0;background:none;cursor:pointer;padding:5px 7px;border-radius:6px;font-size:.95rem}
 .lista button:hover{background:#f1f5f9}
@@ -87,7 +87,7 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 <label>Skupina (jen bez země)<input id="f_group" placeholder="Ostatní"></label>
 <label>Země (podle ní kategorie v playlistu)<select id="f_country"></select></label>
 <label>Kategorie<input id="f_category" placeholder="moře"></label>
-<label>Typ<select id="f_type"><option>auto</option><option>direct</option><option>ytdlp</option><option>ytkanal</option><option>skyline</option><option>feratel</option><option>ipcamlive</option><option>mjpeg</option><option>regex</option></select></label>
+<label>Typ<select id="f_type"><option>auto</option><option>direct</option><option>ytdlp</option><option>ytkanal</option><option>skyline</option><option>feratel</option><option>ipcamlive</option><option>mjpeg</option><option>regex</option><option>snimek</option></select></label>
 <label>Název přenosu (ytkanal: kanál + text z názvu, re:… = regex)<input id="f_match" placeholder="Times Square"></label>
 <label>Mód<select id="f_mode"><option>auto</option><option>redirect</option><option>proxy</option></select></label>
 <label>Regex (jen typ regex)<input id="f_regex" placeholder="výchozí: …\.m3u8…"></label>
@@ -132,7 +132,7 @@ async function api(cesta, opt = {}) {
 const vlajka = cc => cc && /^[A-Za-z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0))) : '🌐';
 const zemeN = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '';
 const vyska = s => { const m = /x(\d+)/.exec(s.resolution || ''); if (!m) return ''; const h = +m[1]; return h >= 2000 ? '4K' : h >= 1400 ? '1440p' : h >= 1000 ? '1080p' : h >= 700 ? '720p' : h + 'p'; };
-const typN = t => ({ytkanal: 'YouTube', ytdlp: 'YouTube', skyline: 'Skyline', feratel: 'Feratel', mjpeg: 'MJPEG', ipcamlive: 'IPCam', direct: 'm3u8', regex: 'web', auto: 'auto'}[t] || t);
+const typN = t => ({ytkanal: 'YouTube', ytdlp: 'YouTube', skyline: 'Skyline', feratel: 'Feratel', mjpeg: 'MJPEG', ipcamlive: 'IPCam', direct: 'm3u8', regex: 'web', snimek: 'snímek', auto: 'auto'}[t] || t);
 const nahled = c => `../thumb/${encodeURIComponent(c.id)}.jpg?k=${encodeURIComponent(KL)}&t=${Date.now() / 3600000 | 0}`;
 
 async function nacti() {

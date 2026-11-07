@@ -19,7 +19,7 @@ import time
 import httpx
 
 ZDROJ = "https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/kamery_pridat.json"
-TYPY = ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "ipcamlive", "mjpeg", "regex")
+TYPY = ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "ipcamlive", "mjpeg", "regex", "snimek")
 ZNACKA = "doplnit_kamery.py"
 
 

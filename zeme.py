@@ -29,9 +29,10 @@ def nazev(kod):
 
 # zaměření kamery → sjednocená skupina (ruční seznam i sběr používaly různé názvy)
 TEMA = {"město": "Města", "mesto": "Města", "hory": "Hory", "železnice": "Doprava", "letiště": "Doprava", "doprava": "Doprava",
-        "přístav": "Voda", "moře": "Voda", "voda": "Voda", "ptáci": "Ptáci", "zvířata": "Zvířata", "příroda": "Příroda"}
+        "přístav": "Voda", "moře": "Voda", "voda": "Voda", "ptáci": "Ptáci", "zvířata": "Zvířata", "příroda": "Příroda",
+        "počasí": "Počasí", "pocasi": "Počasí"}
 TEMA_SVET = {"Města": "Města", "Hory": "Hory", "Doprava": "Doprava (nádraží, letiště)", "Voda": "Moře, pláže a přístavy",
-             "Ptáci": "Ptáci", "Zvířata": "Zvířata", "Příroda": "Příroda", "Ostatní": "Ostatní"}
+             "Ptáci": "Ptáci", "Zvířata": "Zvířata", "Příroda": "Příroda", "Počasí": "Počasí (meteostanice)", "Ostatní": "Ostatní"}
 DOMACI = ("CZ",)          # země dělené podle zaměření (ostatní jen podle země)
 
 

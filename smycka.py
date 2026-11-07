@@ -3,6 +3,7 @@
 Při sledování server klip stáhne, bez překódování přebalí na HLS segmenty (ffmpeg -c copy) a podává ho jako nekonečný
 „živý“ playlist (posuvné okno podle času, #EXT-X-DISCONTINUITY na konci smyčky). Klip se obnoví po 10 min.
 Data jen v /tmp (PrivateTmp služby), drží se poslední 2 verze na kameru. Bez diváků se nic nestahuje.
+Typ „snimek“ (7. 11. 2026): z obrázku (JPG/PNG) udělá ffmpeg 20s video (H.264, 2 snímky/s), obnova po 2 min.
 """
 import asyncio
 import math
@@ -15,6 +16,7 @@ import hls
 
 KOREN = "/tmp/webcams-smycka"
 OBNOVA = 600
+OBNOVA_SNIMEK = 120
 _stav, _zamky = {}, {}
 
 
@@ -24,25 +26,33 @@ def _zamek(cid):
     return _zamky[cid]
 
 
-async def priprav(cfg, cid, url, headers=None):
+async def priprav(cfg, cid, url, headers=None, snimek=False):
+    obnova = OBNOVA_SNIMEK if snimek else OBNOVA
     st = _stav.get(cid)
-    if st and time.time() - st["t"] < OBNOVA:
+    if st and time.time() - st["t"] < obnova:
         return st
     async with _zamek(cid):
         st = _stav.get(cid)
-        if st and time.time() - st["t"] < OBNOVA:
+        if st and time.time() - st["t"] < obnova:
             return st
         ver = str(int(time.time()))
         d = os.path.join(KOREN, cid, ver)
         os.makedirs(d, exist_ok=True)
         klip = os.path.join(d, "klip.mp4")
-        async with hls.client(cfg).stream("GET", url, headers=hls.req_headers(cfg, dict({"Referer": "https://webtvfc.feratel.com/"}, **(headers or {})))) as r:
+        zakl = {} if snimek else {"Referer": "https://webtvfc.feratel.com/"}
+        async with hls.client(cfg).stream("GET", url, headers=hls.req_headers(cfg, dict(zakl, **(headers or {})))) as r:
             r.raise_for_status()
             with open(klip, "wb") as f:
                 async for ch in r.aiter_bytes(262144):
                     f.write(ch)
+        if snimek:     # stojící obraz: 20 s, 2 snímky/s, klíčový snímek každé 2 s; rozměry sudé, nejvýš 1920 px na šířku
+            vstup = ["-loop", "1", "-framerate", "2", "-i", klip, "-t", "20",
+                     "-vf", "scale='min(1920,iw)':-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+                     "-tune", "stillimage", "-r", "2", "-g", "4", "-an"]
+        else:
+            vstup = ["-i", klip, "-c", "copy"]
         p = await asyncio.create_subprocess_exec(
-            "ffmpeg", "-y", "-v", "error", "-i", klip, "-c", "copy", "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod",
+            "ffmpeg", "-y", "-v", "error", *vstup, "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod",
             "-hls_segment_filename", os.path.join(d, "s%03d.ts"), os.path.join(d, "index.m3u8"),
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
         try:

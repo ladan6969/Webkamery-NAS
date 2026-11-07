@@ -5,6 +5,7 @@ type: direct (m3u8 bez tokenu) | ytdlp (YouTube, Twitch, SkylineWebcams… – j
 Místo pro pozdější „sniffer“ (headless prohlížeč): další typ v RESOLVERS.
 """
 import asyncio
+import email.utils
 import json
 import logging
 import os
@@ -116,6 +117,27 @@ async def _feratel(cfg, cam):
         if r.status_code != 200 or "video" not in r.headers.get("content-type", ""):
             raise ResolveError("feratel: klip kamery %s není (HTTP %s)" % (cid, r.status_code))
     return url
+
+
+SNIMEK_MAX_STARI = 6 * 3600       # starší obrázek = kamera zamrzla (Last-Modified)
+
+
+async def _snimek(cfg, cam):
+    """kamera, která dává jen obrázek (JPG/PNG, obnovovaný po minutách – ČHMÚ, holidayinfo…): ověří, že je to obrázek
+    a není zamrzlý; služba z něj dělá video smyčku (smycka.py)"""
+    async with hls.client(cfg).stream("GET", cam["source"], headers=hls.req_headers(cfg, cam.get("headers"))) as r:
+        typ = r.headers.get("content-type", "")
+        if r.status_code != 200 or not typ.startswith("image/"):
+            raise ResolveError("snímek: není obrázek (HTTP %s, %s)" % (r.status_code, typ or "?"))
+        lm = r.headers.get("last-modified")
+    if lm:
+        try:
+            stari = time.time() - email.utils.parsedate_to_datetime(lm).timestamp()
+        except (TypeError, ValueError):
+            stari = 0
+        if stari > SNIMEK_MAX_STARI:
+            raise ResolveError("snímek: obrázek se neobnovuje (naposledy před %d h)" % (stari // 3600))
+    return cam["source"]
 
 
 async def _ipcamlive(cfg, cam):
@@ -332,8 +354,8 @@ async def _regex(cfg, cam):
 
 
 RESOLVERS = {"direct": _direct, "ytdlp": _ytdlp_cam, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel,
-             "ipcamlive": _ipcamlive, "mjpeg": _mjpeg, "regex": _regex}
-NE_HLS = ("feratel", "mjpeg")          # výsledek není HLS playlist (smyčka klipu / MJPEG)
+             "ipcamlive": _ipcamlive, "mjpeg": _mjpeg, "regex": _regex, "snimek": _snimek}
+NE_HLS = ("feratel", "mjpeg", "snimek")   # výsledek není HLS playlist (smyčka klipu / MJPEG / smyčka ze snímku)
 
 
 def typ_odhad(cam):

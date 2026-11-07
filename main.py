@@ -159,9 +159,9 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi"):
         return PlainTextResponse("Kamera %s teď nejde načíst: %s" % (cam["name"], ex), 503)
     if e["kind"] == "mjpeg":                    # MJPEG: přehrávač si ho otevře sám
         return RedirectResponse(e["url"], 302)
-    if e["kind"] == "feratel":                  # poslední klip → nekonečná HLS smyčka
+    if e["kind"] in ("feratel", "snimek"):     # poslední klip / obrázek → nekonečná HLS smyčka
         try:
-            st = await smycka.priprav(CFG, cid, e["url"], cam.get("headers"))
+            st = await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek")
         except Exception as ex:
             log.warning("smyčka %s: %s", cid, ex)
             return PlainTextResponse("Kamera %s: klip nejde připravit (%s)" % (cam["name"], ex), 503)
@@ -359,7 +359,7 @@ def _cista_kamera(d):
         raise HTTPException(400, "id: 2–40 znaků a-z, 0-9, _ a -")
     if not str(c["source"]).startswith(("http://", "https://")):
         raise HTTPException(400, "source musí být http(s) adresa")
-    if c["type"] not in ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "ipcamlive", "mjpeg", "regex") or c["mode"] not in ("auto", "redirect", "proxy"):
+    if c["type"] not in ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "ipcamlive", "mjpeg", "regex", "snimek") or c["mode"] not in ("auto", "redirect", "proxy"):
         raise HTTPException(400, "neplatný type / mode")
     if not isinstance(c["headers"], dict):
         raise HTTPException(400, "headers musí být objekt")
