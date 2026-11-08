@@ -70,6 +70,7 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 </style></head><body>
 <header><div class="hl-in"><h1>📷 Webkamery <small id="podtitul"></small></h1>
 <div><span id="stavKontroly"></span>
+<button class="btn" id="zastavitKontrolu" style="display:none" onclick="zastavitKontrolu()">⏹ Zastavit kontrolu</button>
 <button class="btn" onclick="kontrola()">▶ Spustit kontrolu všech</button>
 <button class="btn" onclick="novaKamera()">＋ Přidat kameru</button>
 <a class="btn" href="logout">Odhlásit</a></div></div></header>
@@ -144,8 +145,11 @@ async function nacti() {
   document.getElementById('odkazy').innerHTML = Object.entries(D.odkazy).map(([n, u], i) =>
     `<div class="odk"><span>${esc(n)}</span><code title="${esc(u)}">${esc(u)}</code><button class="btn" onclick="kopiruj(${i},this)">Kopírovat</button></div>`).join('');
   const k = D.kontrola;
-  document.getElementById('stavKontroly').textContent = k.active ? `kontrola běží ${k.done}/${k.total} · ` :
+  document.getElementById('stavKontroly').textContent = k.active ? `kontrola ${k.zastavit ? 'se zastavuje' : 'běží'} ${k.done}/${k.total} · ` :
     (D.last_check ? 'poslední kontrola ' + D.last_check + ' · ' : '');
+  const stop = document.getElementById('zastavitKontrolu');
+  stop.style.display = k.active ? '' : 'none';
+  stop.disabled = !!k.zastavit;
   document.getElementById('podtitul').textContent = D.cams.length + ' kamer';
   dlazdice(); varovani(); naplnFiltry(); pohled(POHLED, true);
   vykresli(window._strana || 1);
@@ -359,6 +363,11 @@ async function prepni(id) { await api('cams/' + encodeURIComponent(id) + '/prepn
 async function smaz(id) { if (confirm('Smazat kameru ' + id + '?')) { await api('cams/' + encodeURIComponent(id), {method: 'DELETE'}); nacti(); } }
 async function kontrola(id) {
   try { await api('check' + (id ? '?id=' + encodeURIComponent(id) : ''), {method: 'POST'}); setTimeout(nacti, 800); }
+  catch (e) { alert(e.message || e); }
+}
+async function zastavitKontrolu() {
+  if (!confirm('Zastavit běžící kontrolu? Hotové výsledky zůstanou uložené, rozdělané kamery ještě doběhnou.')) return;
+  try { await api('check/stop', {method: 'POST'}); setTimeout(nacti, 300); }
   catch (e) { alert(e.message || e); }
 }
 nacti();

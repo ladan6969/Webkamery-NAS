@@ -15,9 +15,12 @@ import logging.handlers
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import time
+
+from urllib.parse import urljoin
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
@@ -148,6 +151,63 @@ def najdi(cid):
     return cam
 
 
+_stopy = {}          # id kamery → (platí do, kodek obrazu nebo None) – kamery bez zvuku
+
+
+async def _kodek_bez_zvuku(cam, e, text, base):
+    """kodek obrazu, když stream nemá zvuk (MPEG-TS); jinak None. Výsledek platí 6 h, při neúspěchu 5 min."""
+    cid = cam["id"]
+    z = _stopy.get(cid)
+    if z and z[0] > time.time():
+        return z[1]
+    seg = hls.last_segment(text)
+    if not seg or "#EXT-X-MAP" in text:
+        return None
+    s = await hls.stopy_segmentu(CFG, urljoin(base or e["url"], seg), cam.get("headers"))
+    kodek = s["kodek"] if s and not s["zvuk"] else None
+    _stopy[cid] = (time.time() + (21600 if s else 300), kodek)
+    if kodek:
+        log.info("cam %s: bez zvuku, kodek %s", cid, kodek)
+    return kodek
+
+
+PREDNACITAT_MAX = 40
+PREDNACITAT_REZERVA = 1800      # s: obnovit, když adrese zbývá méně
+
+
+def _z_youtube(c):
+    s = c.get("source") or ""
+    return c.get("type") in ("ytdlp", "ytkanal") or "youtube." in s or "youtu.be" in s
+
+
+async def _prednacti_oblibene():
+    """NAS: adresy oblíbených kamer z YouTube drží čerstvé, aby se v Kodi spustily hned (limit Kodi je asi 20 s, yt-dlp na NASu trvá déle)."""
+    await asyncio.sleep(180)
+    while True:
+        try:
+            for c in [x for x in store.cams() if x.get("oblibena") and x.get("enabled", True) and _z_youtube(x)][:PREDNACITAT_MAX]:
+                if checker.running["active"] or checker._nas_vytizeny():
+                    break
+                z = cache.get(c["id"])
+                if z and z["expires"] - time.time() > PREDNACITAT_REZERVA:
+                    continue
+                try:
+                    await aktualni(c)
+                    log.info("přednačteno: %s", c["id"])
+                except Exception as ex:
+                    log.info("přednačtení %s: %s", c["id"], ex)
+                await asyncio.sleep(20)     # přehrávání má přednost před dalším načítáním
+        except Exception as ex:
+            log.warning("přednačítání: %s", ex)
+        await asyncio.sleep(600)
+
+
+@app.on_event("startup")
+async def _start_prednacitani():
+    if CFG.get("vlastni_nas"):
+        asyncio.create_task(_prednacti_oblibene())
+
+
 @app.api_route("/cam/{cid}", methods=["GET", "HEAD"])
 async def cam_stream(cid: str, request: Request, client: str = "kodi"):
     key = need_key(request)
@@ -175,6 +235,11 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi"):
         cache.drop(cid)
         log.warning("cam %s: playlist %s", cid, ex)
         return PlainTextResponse("Kamera %s: playlist nejde stáhnout (%s)" % (cam["name"], ex.__class__.__name__), 503)
+    if client == "kodi" and not hls.is_master(text):      # stream bez zvuku: Kodi potřebuje vědět, že má jen obraz
+        kodek = await _kodek_bez_zvuku(cam, e, text, base)
+        if kodek:
+            cil = e["url"] if mode == "redirect" else hls.proxy_url(CFG, cid, e["url"], key)
+            return Response(hls.master_jen_obraz(cil, kodek), media_type=MPEGURL, headers={"Cache-Control": "no-store"})
     if client == "kodi" and mode == "redirect" and not hls.is_master(text):   # jediná kvalita – není co vybírat, Kodi jde rovnou na zdroj
         return RedirectResponse(e["url"], 302)
     if client in ("e2", "kodi"):                # jen nejvyšší varianta, absolutní URI
@@ -459,12 +524,23 @@ async def api_test(request: Request):
 
 @app.post("/admin/api/check")
 async def api_check(request: Request, id: str = ""):
-    """Kontrola všech kamer (cron 4:45) nebo jedné (?id=…) – běží na pozadí, stav v /admin/api/cams → kontrola."""
+    """Kontrola všech kamer (cron 2:45 na NASu, 4:45 na VPS) nebo jedné (?id=…) – běží na pozadí, stav v /admin/api/cams → kontrola."""
     need_admin(request)
     if checker.running["active"]:
         return JSONResponse({"error": "kontrola už běží", "kontrola": checker.running}, 409)
     asyncio.create_task(_kontrola(id or None))
     return {"ok": True, "spusteno": id or "všechny"}
+
+
+@app.post("/admin/api/check/stop")
+async def api_check_stop(request: Request):
+    """Zastaví běžící kontrolu: další kamery už nebere, rozdělané doběhnou a hotové výsledky se uloží."""
+    need_admin(request)
+    if not checker.running["active"]:
+        return {"ok": True, "bezi": False}
+    checker.running["zastavit"] = True
+    log.info("admin: kontrola se zastavuje (%d/%d)", checker.running["done"], checker.running["total"])
+    return {"ok": True, "bezi": True}
 
 
 async def _kontrola(only):
@@ -519,6 +595,39 @@ def nahodne_heslo():
     print("Heslo do administrace: %s   (uložené jen jako hash – zapiš si ho; platí po (re)startu služby)" % h)
 
 
+def nas_nocni_plan():
+    """NAS: noční úlohy o 2 hodiny dřív (8. 11. 2026, kontrola zatěžovala NAS až do dne). Nové verze si přepíše crontab samy při
+    startu, přes OTA, bez zásahu v Plánovači. Mění jen řádky této instalace s původním časem. Aktualizace kódu až po nočním
+    nahrání na GitHub (2:00). crond se nerestartuje: restart by shodil i službu spuštěnou z cronu, změnu souboru si načte sám."""
+    soubor = os.environ.get("WEBCAMS_CRONTAB", "/etc/crontab")
+    plan = (("aktualizuj_kod.py", "0", "10"), ("webcams.sh ytdlp", "15", "15"), ("doplnit_kamery.py", "30", "30"), ("webcams.sh kontrola", "45", "45"))
+    try:
+        with open(soubor, encoding="utf-8") as f:
+            radky = f.read().splitlines(keepends=True)
+        zmeneno = 0
+        for i, radek in enumerate(radky):
+            m = re.match(r"(\d+)(\s+)4(\s+.*)", radek, re.S)
+            if not m or store.BASE not in radek:
+                continue
+            for znacka, stara, nova in plan:
+                if znacka in radek and m.group(1) == stara:
+                    radky[i] = nova + m.group(2) + "2" + m.group(3)
+                    zmeneno += 1
+                    break
+        if not zmeneno:
+            return
+        if not os.path.exists(soubor + ".pred-webcams-noc"):
+            shutil.copy2(soubor, soubor + ".pred-webcams-noc")
+        docasny = soubor + ".webcams-tmp"
+        with open(docasny, "w", encoding="utf-8") as f:
+            f.write("".join(radky))
+        shutil.copystat(soubor, docasny)
+        os.replace(docasny, soubor)
+        log.info("crontab: %d úloh webkamer posunuto o 2 hodiny dřív", zmeneno)
+    except OSError as e:
+        log.warning("crontab: %s", e)
+
+
 if __name__ == "__main__":
     if "--init" in sys.argv:
         init()
@@ -530,6 +639,12 @@ if __name__ == "__main__":
         if not CFG["secret"] or not CFG["access_keys"]:
             sys.exit("Nejdřív: venv/bin/python main.py --init")
         placeholder()
+        if CFG.get("vlastni_nas"):
+            nas_nocni_plan()
+            try:
+                os.nice(10)                # NAS: služba i její yt-dlp a ffmpeg ustoupí DSM (8. 11. 2026)
+            except OSError as e:
+                log.warning("nice: %s", e)
         import uvicorn
         uvicorn.run(app, host=CFG["bind"], port=int(CFG["port"]), log_level="warning", proxy_headers=True,
                     forwarded_allow_ips="127.0.0.1")

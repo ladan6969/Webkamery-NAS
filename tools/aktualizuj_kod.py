@@ -6,7 +6,7 @@ Zapnutí na NASu (jednou, jako root, např. v Plánovači úloh):
   curl -fsSL $U/tools/aktualizuj_kod.py -o tools/aktualizuj_kod.py || exit 1
   venv/bin/python tools/aktualizuj_kod.py --instalovat
 
-Pak běží každý den ve 4:00, výpis je v logs/aktualizace.log. Ručně: bez --instalovat.
+Pak běží každý den ve 2:10 (po nočním nahrání na GitHub ve 2:00), výpis je v logs/aktualizace.log. Ručně: bez --instalovat.
 Mění jen kód (*.py, static, vybrané nástroje). config.json, cams.json a state.json se nikdy nepřepisují.
 Po restartu musí /health hlásit novou verzi, jinak se vrátí předchozí kód a tato verze se už nezkouší (.spatna-verze).
 Jiná složka instalace: argument /cesta.
@@ -226,9 +226,9 @@ def instalovat(slozka):
     skript = os.path.join(slozka, "tools", ZNACKA)
     obsah = open(crontab, encoding="utf-8").read() if os.path.exists(crontab) else ""
     if ZNACKA in obsah:
-        print("OTA už je zapnutá: každý den ve 4:00.")
+        print("OTA už je zapnutá: každý den ve 2:10.")
         return
-    radek = "0\t4\t*\t*\t*\troot\t%s %s %s >> %s 2>&1\n" % (os.path.join(slozka, "venv/bin/python"), skript, slozka, log)
+    radek = "10\t2\t*\t*\t*\troot\t%s %s %s >> %s 2>&1\n" % (os.path.join(slozka, "venv/bin/python"), skript, slozka, log)
     with open(crontab, "a", encoding="utf-8") as f:
         f.write(("" if not obsah or obsah.endswith("\n") else "\n") + radek)
     if "WEBCAMS_CRONTAB" not in os.environ:
@@ -238,7 +238,7 @@ def instalovat(slozka):
                     break
             except (OSError, subprocess.SubprocessError):
                 pass
-    print("OTA zapnutá: každý den ve 4:00, log %s" % log)
+    print("OTA zapnutá: každý den ve 2:10, log %s" % log)
 
 
 if __name__ == "__main__":

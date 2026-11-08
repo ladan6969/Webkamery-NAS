@@ -82,8 +82,8 @@ sudo sh nas/webcams-nas.run
 | Program a data | `/volume1/webcams` |
 | Ovládací skript | `/volume1/webcams/webcams.sh` |
 | Start po zapnutí NASu | `/usr/local/etc/rc.d/S99webcams.sh` |
-| Denní kontrola kamer ve 4:45 | `/etc/crontab` |
-| Aktualizace yt-dlp v pondělí ve 4:15 | `/etc/crontab` |
+| Denní kontrola kamer ve 2:45 | `/etc/crontab` |
+| Aktualizace yt-dlp v pondělí ve 2:15 | `/etc/crontab` |
 | Přístupové údaje | `nas/webcams-PRISTUP.txt` |
 
 Jiný port nebo složku nastavíš při spuštění, například `PORT=8094 DEST=/volume1/kamery sh nas/webcams-nas.run`. Se `sudo` napiš proměnné až za něj: `sudo PORT=8094 sh nas/webcams-nas.run`.
@@ -208,7 +208,7 @@ Režim přehrávání:
 
 Hlavičky se zadávají jako JSON, například `{"Referer": "https://www.example.com/"}`.
 
-**Automatický aktualizátor kamer:** jednou spusť v Plánovači úloh jako root příkaz níže. Pak se každý den ve 4:30 doplní nové kamery z `tools/kamery_pridat.json` na GitHubu, bez přeinstalace a bez restartu. Vlastní kamery zůstanou a kameru, kterou smažeš, automatika nevrátí. Výpis je v `/volume1/webcams/logs/doplnit.log`. Nové instalace mají automatiku zapnutou samy.
+**Automatický aktualizátor kamer:** jednou spusť v Plánovači úloh jako root příkaz níže. Pak se každý den ve 2:30 doplní nové kamery z `tools/kamery_pridat.json` na GitHubu, bez přeinstalace a bez restartu. Vlastní kamery zůstanou a kameru, kterou smažeš, automatika nevrátí. Výpis je v `/volume1/webcams/logs/doplnit.log`. Nové instalace mají automatiku zapnutou samy.
 
 ```sh
 cd /volume1/webcams || exit 1
@@ -228,7 +228,7 @@ curl -fsSL $U/tools/aktualizuj_kod.py -o tools/aktualizuj_kod.py || exit 1
 venv/bin/python tools/aktualizuj_kod.py --instalovat
 ```
 
-Pak se NAS každý den ve 4:00 podívá na soubor `VERZE` na GitHubu. Kód stáhne jen při změně verze, po restartu ověří, že služba běží s novou verzí, a jinak vrátí předchozí kód. Nastavení, klíče, heslo a kamery se nemění. Výpis je v `logs/aktualizace.log`. Autor vydá novou verzi tak, že změní soubor `VERZE`.
+Pak se NAS každý den ve 2:10 podívá na soubor `VERZE` na GitHubu. Kód stáhne jen při změně verze, po restartu ověří, že služba běží s novou verzí, a jinak vrátí předchozí kód. Nastavení, klíče, heslo a kamery se nemění. Výpis je v `logs/aktualizace.log`. Autor vydá novou verzi tak, že změní soubor `VERZE`.
 
 **Ruční aktualizace:** stáhni a rozbal nový ZIP podle kroku 3 a znovu spusť krok 4. Nastavení, klíče, heslo, kamery a stav kontrol zůstanou. Seznam kamer z nového ZIPu se tím nepřepíše.
 

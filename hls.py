@@ -149,6 +149,73 @@ def rewrite_for_proxy(cfg, cid, text, base, key):
     return "\n".join(out) + "\n"
 
 
+# ── stopy streamu (kamery bez zvuku v Kodi) ─────────────────────────────────
+_TS_ZVUK = {0x03, 0x04, 0x06, 0x0F, 0x11, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0xA1, 0xA2}     # 0x06 může být AC-3 → raději počítat jako zvuk
+
+
+def ts_stopy(data):
+    """z úseku MPEG-TS: {"video": typ, "zvuk": bool, "kodek": "avc1…"}, None = nepoznáno"""
+    zac = next((i for i in range(min(376, len(data) - 376)) if data[i] == 0x47 and data[i + 188] == 0x47), None) if len(data) > 564 else None
+    if zac is None:
+        return None
+    pmt, stopy, video_pid, es = None, None, None, bytearray()
+    for i in range(zac, len(data) - 187, 188):
+        p = data[i:i + 188]
+        if p[0] != 0x47:
+            return None
+        pid = ((p[1] & 0x1F) << 8) | p[2]
+        o = 4
+        if p[3] & 0x20:
+            o += 1 + p[4]
+        if not p[3] & 0x10 or o >= 188:
+            continue
+        sec = None
+        if p[1] & 0x40 and pid in (0, pmt):
+            sec = p[o + 1 + p[o]:]
+        if pid == 0 and sec and pmt is None and len(sec) >= 12:
+            pmt = ((sec[10] & 0x1F) << 8) | sec[11]
+        elif pid == pmt and sec and stopy is None and len(sec) >= 12 and sec[0] == 0x02:
+            konec = min(3 + (((sec[1] & 0x0F) << 8) | sec[2]) - 4, len(sec))
+            j = 12 + (((sec[10] & 0x0F) << 8) | sec[11])
+            stopy = []
+            while j + 5 <= konec:
+                stopy.append((sec[j], ((sec[j + 1] & 0x1F) << 8) | sec[j + 2]))
+                j += 5 + (((sec[j + 3] & 0x0F) << 8) | sec[j + 4])
+            video_pid = next((s[1] for s in stopy if s[0] in (0x1B, 0x24)), None)
+        elif pid == video_pid and video_pid is not None:
+            es += p[o:]
+    if not stopy or video_pid is None:
+        return None
+    typ = next(s[0] for s in stopy if s[1] == video_pid)
+    kodek = "hvc1.1.6.L120.90" if typ == 0x24 else "avc1.4d4028"
+    if typ == 0x1B:
+        k = bytes(es).find(b"\x00\x00\x01\x67")
+        if k >= 0 and k + 7 <= len(es):
+            kodek = "avc1." + bytes(es[k + 4:k + 7]).hex()
+    return {"video": typ, "zvuk": any(s[0] in _TS_ZVUK for s in stopy), "kodek": kodek}
+
+
+async def stopy_segmentu(cfg, url, headers=None, limit=376000):
+    """prvních pár set kB segmentu → ts_stopy; chyba = None"""
+    data = bytearray()
+    try:
+        async with client(cfg).stream("GET", url, headers=req_headers(cfg, headers)) as r:
+            if r.status_code >= 400:
+                return None
+            async for c in r.aiter_bytes():
+                data += c
+                if len(data) >= limit:
+                    break
+    except Exception:
+        return None
+    return ts_stopy(bytes(data))
+
+
+def master_jen_obraz(url, kodek):
+    """Kodi (inputstream.adaptive) u playlistu bez údajů čeká i zvuk; u streamu bez zvuku hned hlásí konec → master s kodekem jen obrazu"""
+    return '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=4000000,CODECS="%s"\n%s\n' % (kodek, url)
+
+
 def media_sequence(text):
     m = re.search(r"#EXT-X-MEDIA-SEQUENCE:(\d+)", text)
     return int(m.group(1)) if m else None

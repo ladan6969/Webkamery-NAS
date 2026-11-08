@@ -3,7 +3,7 @@
 Zapnutí na NASu (jednou, jako root, např. v Plánovači úloh):
   curl -fsSL https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/doplnit_kamery.py -o /volume1/webcams/tools/doplnit_kamery.py && /volume1/webcams/venv/bin/python /volume1/webcams/tools/doplnit_kamery.py --instalovat
 
-Pak běží každý den ve 4:30 (před kontrolou ve 4:45), výpis je v logs/doplnit.log. Ručně: bez --instalovat.
+Pak běží každý den ve 2:30 (před kontrolou ve 2:45), výpis je v logs/doplnit.log. Ručně: bez --instalovat.
 Tento skript stahuje jen seznam kamer (data); kód aktualizuje tools/aktualizuj_kod.py.
 Kamera se přidá jen jednou: kameru, kterou smažeš, automatika nevrátí (kamery_nabidnute.json). Vlastní kamery a úpravy zůstanou.
 Jiná složka instalace: argument /cesta.
@@ -67,9 +67,9 @@ def instalovat(slozka):
     skript = os.path.join(slozka, "tools", ZNACKA)
     obsah = open(crontab, encoding="utf-8").read() if os.path.exists(crontab) else ""
     if ZNACKA in obsah:
-        print("Automatika už je zapnutá: každý den ve 4:30.")
+        print("Automatika už je zapnutá: každý den ve 2:30.")
         return
-    radek = "30\t4\t*\t*\t*\troot\t%s %s %s >> %s 2>&1\n" % (os.path.join(slozka, "venv/bin/python"), skript, slozka, log)
+    radek = "30\t2\t*\t*\t*\troot\t%s %s %s >> %s 2>&1\n" % (os.path.join(slozka, "venv/bin/python"), skript, slozka, log)
     with open(crontab, "a", encoding="utf-8") as f:
         f.write(("" if not obsah or obsah.endswith("\n") else "\n") + radek)
     if "WEBCAMS_CRONTAB" not in os.environ:
@@ -79,7 +79,7 @@ def instalovat(slozka):
                     break
             except (OSError, subprocess.SubprocessError):
                 pass
-    print("Automatika zapnutá: každý den ve 4:30, log %s" % log)
+    print("Automatika zapnutá: každý den ve 2:30, log %s" % log)
 
 
 if __name__ == "__main__":

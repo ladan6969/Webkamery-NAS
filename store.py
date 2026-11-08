@@ -60,12 +60,12 @@ def load(name, default):
             return default
 
 
-def save(name, data):
+def save(name, data, indent=1):
     with _lock:
         fd, tmp = tempfile.mkstemp(prefix="." + name + ".", dir=BASE)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=1)
+                f.write(json.dumps(data, ensure_ascii=False, indent=indent))
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, path(name))
@@ -122,7 +122,7 @@ def state():
 
 
 def save_state(s):
-    save("state.json", s)
+    save("state.json", s, indent=None)      # bez odsazení: json.dumps pak použije rychlý kodér v C (state.json má přes 2 MB)
 
 
 def sid_for(s, cid):

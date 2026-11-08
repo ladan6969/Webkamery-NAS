@@ -209,10 +209,10 @@ if [ -d /usr/local/etc/rc.d ] || mkdir -p /usr/local/etc/rc.d 2>/dev/null; then
   printf '#!/bin/sh\ncase "$1" in start) %s/webcams.sh start ;; stop) %s/webcams.sh stop ;; esac\n' "$DEST" "$DEST" > /usr/local/etc/rc.d/S99webcams.sh
   chmod 755 /usr/local/etc/rc.d/S99webcams.sh; ok "start po zapnutí NASu (/usr/local/etc/rc.d/S99webcams.sh)"
 fi
-# denní kontrola kamer 4:45, aktualizace yt-dlp v pondělí 4:15 (crontab DSM)
+# denní kontrola kamer 2:45, aktualizace yt-dlp v pondělí 2:15 (crontab DSM)
 if [ -f /etc/crontab ] && ! grep -q "webcams.sh kontrola" /etc/crontab; then
-  printf '45\t4\t*\t*\t*\troot\t%s/webcams.sh kontrola\n15\t4\t*\t*\t1\troot\t%s/webcams.sh ytdlp\n' "$DEST" "$DEST" >> /etc/crontab
-  (systemctl restart crond 2>/dev/null || synoservicectl --restart crond 2>/dev/null || true); ok "plán: kontrola 4:45, yt-dlp po 4:15"
+  printf '45\t2\t*\t*\t*\troot\t%s/webcams.sh kontrola\n15\t2\t*\t*\t1\troot\t%s/webcams.sh ytdlp\n' "$DEST" "$DEST" >> /etc/crontab
+  (systemctl restart crond 2>/dev/null || synoservicectl --restart crond 2>/dev/null || true); ok "plán: kontrola 2:45, yt-dlp po 2:15"
 fi
 
 "$DEST/venv/bin/python" "$DEST/tools/doplnit_kamery.py" --instalovat "$DEST" 2>&1 | sed 's/^/  ✓ /' || true

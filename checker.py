@@ -18,7 +18,12 @@ import resolver
 import store
 
 log = logging.getLogger("webcams")
-running = {"active": False, "done": 0, "total": 0, "started": None}
+running = {"active": False, "done": 0, "total": 0, "started": None, "zastavit": False}
+ZAPIS_KAZDYCH = 60                 # s: jak často kontrola ukládá průběžné výsledky do state.json
+NAS_MAX_ZATEZ = 3.0                # NAS: nad touto zátěží (1 min) kontrola počká s další kamerou
+NAS_MIN_RAM_MB = 100               # NAS: pod tolika MB dostupné paměti kontrola počká
+NAS_CEKANI_KAMERA = 30             # s: nejdelší čekání před jednou kamerou
+NAS_CEKANI_CELKEM = 4 * 3600       # s: celkový rozpočet čekání za jednu kontrolu, ať nestihne doběhnout další den
 # identifikace přehrávačů – některé zdroje (např. WhatsUpCams) VLC / Kodi odmítnou (403), prohlížeč pustí → kamera pojede přes proxy
 PLAYER_UAS = ["VLC/3.0.21 LibVLC/3.0.21", "Kodi/21.1 (Windows NT 10.0; Win64; x64) App_Bitness/64 Version/21.1-(21.1.0)-Git:20240804-4ed79fdbc3"]
 
@@ -204,6 +209,36 @@ def _jen_tydne(st_cam, cfg):
     return time.time() - posledni < 6.5 * 86400
 
 
+def _dostupna_ram_mb():
+    """MemAvailable, na starších jádrech MemFree + Buffers + Cached; None = nelze zjistit"""
+    try:
+        hodnoty = {}
+        with open("/proc/meminfo", encoding="ascii") as f:
+            for radek in f:
+                klic, _, zbytek = radek.partition(":")
+                hodnoty[klic] = int(zbytek.split()[0])
+        kb = hodnoty.get("MemAvailable")
+        if kb is None:
+            kb = hodnoty["MemFree"] + hodnoty.get("Buffers", 0) + hodnoty.get("Cached", 0)
+        return kb / 1024
+    except (OSError, KeyError, ValueError, IndexError):
+        return None
+
+
+def _nas_vytizeny():
+    ram = _dostupna_ram_mb()
+    return os.getloadavg()[0] > NAS_MAX_ZATEZ or (ram is not None and ram < NAS_MIN_RAM_MB)
+
+
+async def _pockej_na_vykon(dobrzdeno):
+    """NAS: když je vytížený, kontrola ustoupí, aby DSM a přehrávání zůstaly dostupné (8. 11. 2026)."""
+    cekal = 0
+    while cekal < NAS_CEKANI_KAMERA and dobrzdeno[0] < NAS_CEKANI_CELKEM and not running["zastavit"] and _nas_vytizeny():
+        await asyncio.sleep(5)
+        cekal += 5
+        dobrzdeno[0] += 5
+
+
 async def check_all(cfg, only=None):
     """Kontrola všech (nebo jedné) zapnutých kamer. → souhrn"""
     if running["active"]:
@@ -213,24 +248,45 @@ async def check_all(cfg, only=None):
         st = store.state()["cams"]                 # jednou – ne pro každou kameru (7. 11. 2026: 7 000× načtení zablokovalo službu)
         cams = [c for c in cams if not _jen_tydne(st.get(c["id"]), cfg)]
     cams.sort(key=lambda c: (c.get("type") != "ytkanal", c.get("source")))      # kamery jednoho kanálu za sebou → jeden výpis kanálu
-    running.update(active=True, done=0, total=len(cams), started=time.time())
+    running.update(active=True, done=0, total=len(cams), started=time.time(), zastavit=False)
     zmeny = {"nove_mrtve": [], "ozivene": []}
     thumbs = os.path.join(store.BASE, cfg["thumbs_dir"])
     os.makedirs(thumbs, exist_ok=True)
     fronta = list(cams)
+    # Výsledky se zapisují do state.json najednou (8. 11. 2026): celý soubor (přes 2 MB) po každé kameře blokoval NAS.
+    # Do souboru jdou jen změněná pole, ať se nepřepíše to, co mezitím uložila jiná část služby.
+    zaklad = store.state()["cams"]
+    cekajici = {}
+    zapsano = time.time()
+    dobrzdeno = [0.0]
+
+    def zapsat():
+        nonlocal zaklad, zapsano
+        zapsano = time.time()
+        if not cekajici:
+            return
+        s = store.state()
+        for cid, zmena in cekajici.items():
+            s["cams"].setdefault(cid, {}).update(zmena)
+            store.sid_for(s, cid)
+        store.save_state(s)
+        cekajici.clear()
+        zaklad = s["cams"]
 
     async def pracovnik(cislo):
         prvni = True
-        while fronta:
+        while fronta and not running["zastavit"]:
             c = fronta.pop(0)
             if not prvni:
                 await asyncio.sleep(cfg["check_pause"])
             prvni = False
+            if only is None and cfg.get("vlastni_nas"):
+                await _pockej_na_vykon(dobrzdeno)
+            if running["zastavit"]:
+                break
             lehce = only is None and c.get("type") in ("ytkanal", "skyline")
             r = await (lehka if lehce else probe)(cfg, c, os.path.join(thumbs, c["id"] + ".jpg"))
-            # načíst – upravit – uložit bez await mezi tím (souběžné pracovníky asyncio nepřeruší)
-            s = store.state()
-            prev = s["cams"].get(c["id"], {})
+            prev = zaklad.get(c["id"], {})
             was_visible = visible(prev, cfg)
             now = time.strftime("%Y-%m-%d %H:%M:%S")
             x = dict(prev)
@@ -250,20 +306,22 @@ async def check_all(cfg, only=None):
                     x["fail_den"] = dnes
                 if was_visible and not visible(x, cfg):
                     zmeny["nove_mrtve"].append(c["name"])
-            s["cams"][c["id"]] = x
-            store.sid_for(s, c["id"])
-            store.save_state(s)
+            cekajici[c["id"]] = {k: v for k, v in x.items() if k not in prev or prev[k] != v}
+            if only is not None or time.time() - zapsano >= ZAPIS_KAZDYCH:
+                zapsat()
             running["done"] += 1
             log.info("kontrola %s: %s %s", c["id"], r["status"], r["error"] or r["resolution"])
 
     try:
         n = max(1, min(int(cfg.get("check_parallel", 3)), len(cams) or 1))
         await asyncio.gather(*(pracovnik(i) for i in range(n)))
-        if only is None:
+        zapsat()
+        if only is None and not running["zastavit"]:      # zastavená kontrola se jako dokončená nepočítá
             s = store.state()
             s["last_check"] = time.strftime("%Y-%m-%d %H:%M:%S")
             store.save_state(s)
     finally:
+        zapsat()                                   # i po chybě nebo přerušení: hotové výsledky neztratit
         running["active"] = False
     if only is None and (zmeny["nove_mrtve"] or zmeny["ozivene"]):
         await telegram(cfg, zmeny)

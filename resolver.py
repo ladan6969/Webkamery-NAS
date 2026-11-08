@@ -120,12 +120,28 @@ async def _feratel(cfg, cam):
 
 
 SNIMEK_MAX_STARI = 6 * 3600       # starší obrázek = kamera zamrzla (Last-Modified)
+SNIMEK_HODINA = "{hodina_utc}"          # v adrese snímku: aktuální hodina UTC jako 20261108_0900
 
 
 async def _snimek(cfg, cam):
+    """Adresa může obsahovat {hodina_utc} (snímky Ventusky): zkusí aktuální hodinu a dvě předchozí, nejnovější bývá ještě nenahraná."""
+    if SNIMEK_HODINA not in cam["source"]:
+        return await _snimek_adresa(cfg, cam, cam["source"])
+    ted = int(time.time() // 3600) * 3600
+    chyba = None
+    for i in range(3):
+        adresa = cam["source"].replace(SNIMEK_HODINA, time.strftime("%Y%m%d_%H00", time.gmtime(ted - i * 3600)))
+        try:
+            return await _snimek_adresa(cfg, cam, adresa)
+        except ResolveError as e:
+            chyba = chyba or e
+    raise chyba
+
+
+async def _snimek_adresa(cfg, cam, adresa):
     """kamera, která dává jen obrázek (JPG/PNG, obnovovaný po minutách – ČHMÚ, holidayinfo…): ověří, že je to obrázek
     a není zamrzlý; služba z něj dělá video smyčku (smycka.py)"""
-    async with hls.client(cfg).stream("GET", cam["source"], headers=hls.req_headers(cfg, cam.get("headers"))) as r:
+    async with hls.client(cfg).stream("GET", adresa, headers=hls.req_headers(cfg, cam.get("headers"))) as r:
         typ = r.headers.get("content-type", "")
         if r.status_code != 200 or not typ.startswith("image/"):
             raise ResolveError("snímek: není obrázek (HTTP %s, %s)" % (r.status_code, typ or "?"))
@@ -137,7 +153,7 @@ async def _snimek(cfg, cam):
             stari = 0
         if stari > SNIMEK_MAX_STARI:
             raise ResolveError("snímek: obrázek se neobnovuje (naposledy před %d h)" % (stari // 3600))
-    return cam["source"]
+    return adresa
 
 
 async def _ipcamlive(cfg, cam):
