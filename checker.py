@@ -101,10 +101,11 @@ async def _stahni_nahled(cfg, url, dest, headers=None):
     return False
 
 
-async def lehka(cfg, cam, thumb_dest=None):
+async def lehka(cfg, cam, thumb_dest=None, rozliseni=False):
     """Lehká denní kontrola (3. 11. 2026) – tisíce kamer bez zátěže zdrojů:
     ytkanal = přenos je ve výpisu živých přenosů kanálu (výpis 1× za 10 min na kanál) + náhled z i.ytimg.com;
-    skyline = token ze stránky + playlist má segmenty a není ukončený; náhled ffmpegem jen když chybí / je starší 7 dní."""
+    skyline = token ze stránky + playlist má segmenty a není ukončený; náhled ffmpegem jen když chybí / je starší 7 dní;
+    rozliseni=True (10. 11. 2026): u skyline i rozlišení – z masteru (RESOLUTION) nebo ffprobe posledního segmentu (~50 kB)."""
     t0 = time.time()
     r = {"ok": False, "status": "mrtvá", "error": None, "type": cam.get("type"), "resolution": None, "fps": None, "codec": None,
          "seconds": None, "thumb": False, "url": None, "lehka": True}
@@ -119,10 +120,19 @@ async def lehka(cfg, cam, thumb_dest=None):
         else:                                             # skyline
             url, typ = await resolver.resolve(cfg, cam)
             text, base = await hls.fetch_text(cfg, url, cam.get("headers"))
+            res = None
             if hls.is_master(text):
-                text, _ = await hls.fetch_text(cfg, urljoin(base, hls.best_variant(text)[1]), cam.get("headers"))
+                best = hls.best_variant(text)
+                res = best[0].get("RESOLUTION") or None
+                text, base = await hls.fetch_text(cfg, urljoin(base, best[1]), cam.get("headers"))
             if "#EXT-X-ENDLIST" in text or not hls.last_segment(text):
                 raise resolver.ResolveError("playlist bez segmentů / ukončený")
+            if rozliseni and res:
+                r["resolution"] = res.lower()
+            elif rozliseni:
+                info = await ffprobe(cfg, urljoin(base, hls.last_segment(text)), cam.get("headers"))
+                if info and info["width"] and info["height"]:
+                    r.update(resolution="%sx%s" % (info["width"], info["height"]), fps=info["fps"], codec=info["codec"])
             cache.put(cam["id"], url, cam.get("headers"), typ, cfg)
             if thumb_dest and (not os.path.exists(thumb_dest) or time.time() - os.path.getmtime(thumb_dest) > 7 * 86400):
                 r["thumb"] = await thumbnail(cfg, url, cam.get("headers"), thumb_dest)
@@ -194,6 +204,15 @@ def visible(st_cam, cfg):
     if not st_cam.get("last_ok") and st_cam.get("fail_streak", 0) >= 1:
         return False
     return st_cam.get("fail_streak", 0) < cfg["dead_after"]
+
+
+def _rozliseni_stare(st_cam, dni=7):
+    """lehká kontrola zjišťuje rozlišení jen když chybí nebo je starší než týden (10. 11. 2026)"""
+    try:
+        kdy = time.mktime(time.strptime((st_cam or {}).get("resolution_kdy") or "", "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        return True
+    return time.time() - kdy > dni * 86400
 
 
 def _jen_tydne(st_cam, cfg):
@@ -285,14 +304,20 @@ async def check_all(cfg, only=None):
             if running["zastavit"]:
                 break
             lehce = only is None and c.get("type") in ("ytkanal", "skyline")
-            r = await (lehka if lehce else probe)(cfg, c, os.path.join(thumbs, c["id"] + ".jpg"))
             prev = zaklad.get(c["id"], {})
+            if lehce:
+                r = await lehka(cfg, c, os.path.join(thumbs, c["id"] + ".jpg"),
+                                rozliseni=c.get("type") == "skyline" and _rozliseni_stare(prev))
+            else:
+                r = await probe(cfg, c, os.path.join(thumbs, c["id"] + ".jpg"))
             was_visible = visible(prev, cfg)
             now = time.strftime("%Y-%m-%d %H:%M:%S")
             x = dict(prev)
             x.update(status=r["status"], last_check=now, error=r["error"], seconds=r["seconds"])
-            if r["ok"] and r.get("lehka"):                # lehká kontrola rozlišení nezjišťuje – nechat poslední známé
+            if r["ok"] and r.get("lehka"):                # lehká kontrola: rozlišení jen občas (skyline) – jinak nechat poslední známé
                 x.update(last_ok=now, fail_streak=0, fail_den=None, type_used=r["type"])
+                if r.get("resolution"):
+                    x.update(resolution=r["resolution"], fps=r["fps"], codec=r["codec"], resolution_kdy=now)
             elif r["ok"]:
                 x.update(last_ok=now, fail_streak=0, fail_den=None, type_used=r["type"], resolution=r["resolution"], fps=r["fps"], codec=r["codec"],
                          force_proxy=bool(r.get("force_proxy")))

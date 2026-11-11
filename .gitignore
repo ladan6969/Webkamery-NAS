@@ -14,3 +14,5 @@ thumbs/
 *.log
 # hotový instalační balík (obsahuje data kamer)
 nas/*.run
+# nasazení na card1 (adresa serveru) – neposílat do veřejného repa
+nasadit-card1.sh

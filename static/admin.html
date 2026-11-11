@@ -105,6 +105,7 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 <select id="fZeme" onchange="vykresli(1)"></select>
 <select id="fTema" onchange="vykresli(1)"></select>
 <select id="fTyp" onchange="vykresli(1)"></select>
+<select id="fKval" onchange="vykresli(1)" title="Rozlišení z poslední kontroly kamery"></select>
 <input id="fHledat" placeholder="Hledat v názvu…" oninput="clearTimeout(window._ht);window._ht=setTimeout(()=>vykresli(1),250)">
 <span id="fPocet" class="sed"></span>
 <div class="prepinac"><button id="vMriz" onclick="pohled('mriz')" title="Mřížka náhledů">🔲 Mřížka</button><button id="vTab" onclick="pohled('tab')" title="Tabulka">☰ Tabulka</button></div>
@@ -133,6 +134,8 @@ async function api(cesta, opt = {}) {
 const vlajka = cc => cc && /^[A-Za-z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0))) : '🌐';
 const zemeN = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : '';
 const vyska = s => { const m = /x(\d+)/.exec(s.resolution || ''); if (!m) return ''; const h = +m[1]; return h >= 2000 ? '4K' : h >= 1400 ? '1440p' : h >= 1000 ? '1080p' : h >= 700 ? '720p' : h + 'p'; };
+const KVALITY = ['4K', '1440p', '1080p', '720p', 'nižší', 'nezjištěno'];
+const kvalita = s => { const v = vyska(s); return !v || v === '0p' ? 'nezjištěno' : KVALITY.includes(v) ? v : 'nižší'; };
 const typN = t => ({ytkanal: 'YouTube', ytdlp: 'YouTube', skyline: 'Skyline', feratel: 'Feratel', mjpeg: 'MJPEG', ipcamlive: 'IPCam', direct: 'm3u8', regex: 'web', snimek: 'snímek', auto: 'auto'}[t] || t);
 const nahled = c => `../thumb/${encodeURIComponent(c.id)}.jpg?k=${encodeURIComponent(KL)}&t=${Date.now() / 3600000 | 0}`;
 
@@ -196,6 +199,10 @@ function naplnFiltry() {
   moznosti('fZeme', 'Země', D.cams.map(zemeN));
   moznosti('fTema', 'Zaměření', D.cams.map(c => c._tema));
   moznosti('fTyp', 'Typ', D.cams.map(c => c.type));
+  const el = document.getElementById('fKval'), byla = el.value, n = {};
+  D.cams.forEach(c => { const k = kvalita(D.state[c.id] || {}); n[k] = (n[k] || 0) + 1; });
+  el.innerHTML = '<option value="">Kvalita: vše</option>' + KVALITY.filter(k => n[k]).map(k => `<option value="${k}">${k} (${n[k]})</option>`).join('');
+  if (byla && n[byla]) el.value = byla;
 }
 function pohled(p, tiše) {
   POHLED = p === 'tab' ? 'tab' : 'mriz';
@@ -249,6 +256,7 @@ function vykresli(strana) {
     if (f('fZeme') && zemeN(c) !== f('fZeme')) return false;
     if (f('fTema') && c._tema !== f('fTema')) return false;
     if (f('fTyp') && c.type !== f('fTyp')) return false;
+    if (f('fKval') && kvalita(D.state[c.id] || {}) !== f('fKval')) return false;
     if (q && !(c.name + ' ' + c.id).toLowerCase().includes(q)) return false;
     return true;
   }).sort((a, b) => (a._kat.startsWith('Česko') ? 0 : 1) - (b._kat.startsWith('Česko') ? 0 : 1) ||
