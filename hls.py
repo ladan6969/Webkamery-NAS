@@ -224,3 +224,68 @@ def media_sequence(text):
 def last_segment(text):
     segs = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("#")]
     return segs[-1] if segs else None
+
+
+# ── živé okno (YouTube) ─────────────────────────────────────────────────────
+def dlouhe_okno(uri):
+    """YouTube posílá živé kamery s hodinovým záznamem (playlist_duration/3600) – Kodi pak nezačne od živého konce
+    (11. 11. 2026 Hlavní nádraží o 16 min pozadu). Okno u YouTube změnit nejde (adresa je podepsaná)."""
+    return "googlevideo.com" in uri and "/live/1/" in uri and "playlist_duration/" in uri
+
+
+def oriz_media(text, base, segmentu=6):
+    """media playlist → jen posledních N segmentů (MEDIA-SEQUENCE posunutá, poslední #EXT-X-KEY/MAP zachovaný), URI absolutní"""
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    hlava, segs, cekajici = [], [], []
+    for l in lines:
+        if not l.startswith("#"):
+            segs.append((cekajici, l))
+            cekajici = []
+        elif not segs and not cekajici and not l.startswith(("#EXTINF", "#EXT-X-PROGRAM-DATE-TIME", "#EXT-X-DISCONTINUITY", "#EXT-X-BYTERANGE", "#EXT-X-KEY", "#EXT-X-MAP")):
+            hlava.append(l)
+        else:
+            cekajici.append(l)
+    if len(segs) <= segmentu:
+        return absolutize(text, base)
+    pryc, nech = segs[:-segmentu], segs[-segmentu:]
+    trvale = {}                                   # poslední KEY/MAP z vyhozené části platí i pro ponechané segmenty
+    disk = 0
+    for tagy, _ in pryc:
+        for t in tagy:
+            if t.startswith(("#EXT-X-KEY", "#EXT-X-MAP")):
+                trvale[t.split(":", 1)[0]] = t
+            elif t == "#EXT-X-DISCONTINUITY":
+                disk += 1
+    out = []
+    for l in hlava:
+        if l.startswith("#EXT-X-MEDIA-SEQUENCE:"):
+            l = "#EXT-X-MEDIA-SEQUENCE:%d" % (int(l.split(":", 1)[1]) + len(pryc))
+        elif l.startswith("#EXT-X-DISCONTINUITY-SEQUENCE:") and disk:
+            l = "#EXT-X-DISCONTINUITY-SEQUENCE:%d" % (int(l.split(":", 1)[1]) + disk)
+        elif l.startswith("#EXT-X-PLAYLIST-TYPE"):
+            continue                                  # EVENT by přehrávač vedl na začátek
+        out.append(l)
+    if disk and not any(l.startswith("#EXT-X-DISCONTINUITY-SEQUENCE") for l in out):
+        out.append("#EXT-X-DISCONTINUITY-SEQUENCE:%d" % disk)
+    prvni_tagy = {t.split(":", 1)[0] for t in nech[0][0]}
+    out += [t for k, t in trvale.items() if k not in prvni_tagy]
+    for tagy, uri in nech:
+        out += tagy
+        out.append(uri)
+    return absolutize("\n".join(out), base)
+
+
+def oriz_url(cfg, cid, target, key):
+    b = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
+    return "%s/oriz/%s?u=%s&s=%s&k=%s" % (cfg["public_base"], quote(cid), b, _sig(cfg, cid, target), quote(key))
+
+
+def presmeruj_okno(cfg, cid, text, key):
+    """v (už zkráceném, absolutním) masteru vede media playlisty s dlouhým oknem přes /oriz"""
+    out = []
+    for l in text.splitlines():
+        if l.startswith("#"):
+            out.append(URI_ATTR.sub(lambda m: 'URI="%s"' % (oriz_url(cfg, cid, m.group(1), key) if dlouhe_okno(m.group(1)) else m.group(1)), l))
+        else:
+            out.append(oriz_url(cfg, cid, l, key) if dlouhe_okno(l) else l)
+    return "\n".join(out) + "\n"

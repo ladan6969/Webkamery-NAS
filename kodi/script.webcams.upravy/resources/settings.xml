@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+  <category label="Server">
+    <setting id="server" type="text" label="Adresa serveru webkamer (prázdné = vzít z PVR IPTV Simple)" default=""/>
+    <setting id="heslo" type="text" option="hidden" label="Heslo administrace webkamer" default=""/>
+    <setting id="obnovit" type="bool" label="Po změně hned obnovit kanály TV" default="true"/>
+  </category>
+</settings>

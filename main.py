@@ -249,7 +249,25 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi"):
         text = hls.rewrite_for_proxy(CFG, cid, text, base or e["url"], key)
     elif base:
         text = hls.absolutize(text, base)
+    if client in ("e2", "kodi") and mode != "proxy" and hls.is_master(text):
+        text = hls.presmeruj_okno(CFG, cid, text, key)     # YouTube: jen živý konec, ne hodina záznamu
     return Response(text, media_type=MPEGURL, headers={"Cache-Control": "no-store"})
+
+
+@app.api_route("/oriz/{cid}", methods=["GET", "HEAD"])
+async def oriz(cid: str, request: Request, u: str = "", s: str = ""):
+    """media playlist s hodinovým záznamem (YouTube) → jen posledních ~30 s; segmenty jdou dál přímo ke zdroji"""
+    need_key(request)
+    cam = najdi(cid)
+    target = hls.proxy_target(CFG, cid, u, s)
+    if not target:
+        raise HTTPException(403, "Neplatný odkaz")
+    try:
+        text, base = await hls.fetch_text(CFG, target, cam.get("headers"))
+    except Exception as ex:
+        cache.drop(cid)
+        return PlainTextResponse("Zdroj nejde stáhnout (%s)" % ex.__class__.__name__, 502)
+    return Response(hls.oriz_media(text, base), media_type=MPEGURL, headers={"Cache-Control": "no-store"})
 
 
 @app.api_route("/proxy/{cid}", methods=["GET", "HEAD"])
@@ -501,6 +519,95 @@ async def api_oblibena(cid: str, request: Request):
             x["oblibena"] = not x.get("oblibena")
     store.save_cams(lst)
     return {"ok": True}
+
+
+# ── doplněk Kodi „Webkamery – úpravy“ (KODI_UPRAVY_V1, 11. 11. 2026): přihlášení heslem administrace (cookie) ──
+def _slug(t):
+    import unicodedata
+    t = unicodedata.normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", t).strip("-")[:34] or "kamera"
+
+
+@app.get("/admin/api/kodi/najdi")
+async def api_kodi_najdi(request: Request, id: str = "", nazev: str = ""):
+    """kamera podle id (z ikony / adresy kanálu v Kodi) nebo přesného názvu kanálu"""
+    need_admin(request)
+    n = nazev.strip().casefold()
+    return [{"id": c["id"], "name": c["name"], "oblibena": bool(c.get("oblibena")), "enabled": c["enabled"]}
+            for c in store.cams() if (id and c["id"] == id) or (not id and n and c["name"].strip().casefold() == n)][:20]
+
+
+@app.post("/admin/api/kodi/oblibena")
+async def api_kodi_oblibena(request: Request):
+    """{id, oblibena?: true/false} – bez hodnoty přepne; vrací nový stav"""
+    need_admin(request)
+    d = await request.json()
+    lst = store.cams()
+    c = next((x for x in lst if x["id"] == d.get("id")), None)
+    if not c:
+        raise HTTPException(404, "kamera nenalezena")
+    c["oblibena"] = bool(d["oblibena"]) if "oblibena" in d else not c.get("oblibena")
+    store.save_cams(lst)
+    log.info("kodi: kamera %s oblíbená=%s", c["id"], c["oblibena"])
+    return {"ok": True, "id": c["id"], "name": c["name"], "oblibena": c["oblibena"]}
+
+
+@app.post("/admin/api/kodi/pridat")
+async def api_kodi_pridat(request: Request):
+    """{source, name, country?, oblibena?, ulozit_i_nezivou?} – vyzkouší kameru; když hraje (nebo ulozit_i_nezivou), uloží ji"""
+    need_admin(request)
+    d = await request.json()
+    src, name = (d.get("source") or "").strip(), (d.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "chybí název")
+    lst = store.cams()
+    stejna = next((x for x in lst if x["source"].strip() == src), None)
+    if stejna:
+        if not stejna["enabled"] or (d.get("oblibena") and not stejna.get("oblibena")):
+            stejna["enabled"] = True
+            stejna["oblibena"] = stejna.get("oblibena") or bool(d.get("oblibena"))
+            store.save_cams(lst)
+        return {"ok": True, "uz_byla": True, "id": stejna["id"], "name": stejna["name"], "ulozeno": True}
+    ids = {x["id"] for x in lst}
+    zaklad = "k-" + _slug(name)
+    cid, i = zaklad, 2
+    while cid in ids:
+        cid, i = "%s-%d" % (zaklad, i), i + 1
+    c = _cista_kamera({"id": cid, "name": name, "source": src, "country": (d.get("country") or "").strip().upper()[:2],
+                       "oblibena": bool(d.get("oblibena")), "note": "přidáno z Kodi " + time.strftime("%Y-%m-%d")})
+    r = await checker.probe(CFG, c, None, live_wait=8)
+    r.pop("url", None)
+    r.update(id=cid, name=name, ulozeno=False)
+    if r["ok"] or d.get("ulozit_i_nezivou"):
+        store.save_cams(store.cams() + [c])
+        s = store.state()
+        store.sid_for(s, cid)
+        store.save_state(s)
+        r["ulozeno"] = True
+        log.info("kodi: přidána kamera %s (%s) hraje=%s", cid, src, r["ok"])
+        if r["ok"] and not checker.running["active"]:
+            asyncio.create_task(_kontrola(cid))       # stav + náhled hned, ne až v noci
+    else:
+        cache.drop(cid)
+    return r
+
+
+@app.get("/kodi/", response_class=HTMLResponse)
+async def kodi_slozka():
+    """zdroj souborů pro Kodi (Instalovat ze ZIP): http://<server>/kodi/ – jen když config kodi_doplnek=true (KODI_UPRAVY_V1)"""
+    if not CFG.get("kodi_doplnek"):
+        raise HTTPException(404)
+    d = store.path("kodi")
+    zipy = sorted(f for f in os.listdir(d) if f.endswith(".zip")) if os.path.isdir(d) else []
+    return "<html><body>" + "".join('<a href="%s">%s</a><br>' % (f, f) for f in zipy) + "</body></html>"
+
+
+@app.api_route("/kodi/{name}", methods=["GET", "HEAD"])
+async def kodi_soubor(name: str):
+    p = store.path("kodi/" + os.path.basename(name))
+    if not CFG.get("kodi_doplnek") or not name.endswith(".zip") or not os.path.isfile(p):
+        raise HTTPException(404)
+    return FileResponse(p, media_type="application/zip")
 
 
 @app.post("/admin/api/test")

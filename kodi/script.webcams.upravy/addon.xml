@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="script.webcams.upravy" name="Webkamery – úpravy" version="0.1.0" provider-name="webcams">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+  </requires>
+  <extension point="xbmc.python.script" library="default.py">
+    <provides>executable</provides>
+  </extension>
+  <extension point="kodi.context.item">
+    <menu id="kodi.core.main">
+      <item library="kontext.py">
+        <label>⭐ Webkamera: oblíbená ano / ne</label>
+        <visible>String.StartsWith(ListItem.FileNameAndPath,pvr://channels/tv/)</visible>
+      </item>
+    </menu>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="cs_CZ">Oblíbené a nové kamery přímo z TV v Kodi</summary>
+    <description lang="cs_CZ">V seznamu kanálů TV: kontextové menu → ⭐ Webkamera: oblíbená ano / ne. V Doplňky → Programy → Webkamery – úpravy: přidat kameru adresou (YouTube nebo .m3u8). Potřebuje adresu serveru webkamer a heslo administrace.</description>
+    <platform>all</platform>
+  </extension>
+</addon>
