@@ -16,3 +16,5 @@ thumbs/
 nas/*.run
 # nasazení na card1 (adresa serveru) – neposílat do veřejného repa
 nasadit-card1.sh
+# hotový zip doplňku Kodi (sestavuje se ze složky kodi/script.webcams.upravy)
+kodi/*.zip
