@@ -3,6 +3,7 @@
 Zápis přes tempfile + os.replace, takže soubor nikdy není napůl zapsaný. Jediný zapisovatel je běžící služba
 (kontrola běží uvnitř služby, ne jako druhý proces), proto stačí zámek v rámci procesu.
 """
+import re
 import json
 import os
 import tempfile
@@ -131,3 +132,43 @@ def sid_for(s, cid):
         s["sids"][cid] = 0xA000 + s["next_sid"]
         s["next_sid"] += 1
     return s["sids"][cid]
+
+
+def klic_streamu(url):
+    """stejný stream = stejný server a cesta (bez schématu a parametrů); u YouTube rozhoduje id videa (DUPLICITY_V1, 12. 11. 2026)"""
+    u = (url or "").strip()
+    m = re.search(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|live/|embed/|shorts/)|youtu\.be/)([\w-]{11})", u)
+    if m:
+        return "youtube:" + m.group(1)
+    u = re.sub(r"^https?://", "", u).split("#")[0]
+    cesta, _, dotaz = u.partition("?")
+    par = sorted(p for p in dotaz.split("&") if p and not _PROMENNE.match(p.split("=")[0]))   # cam=, alias= určují kameru
+    return cesta.lower().rstrip("/") + ("?" + "&".join(par) if par else "")
+
+
+# parametry, které se mění (podpisy, tokeny, časy) – kameru neurčují
+_PROMENNE = re.compile(r"(?i)^(token|tok|auth\w*|sig|signature|hash|hdnts|hdnea|wmsauthsign|expires?|exp|e|st|t|ts|time|_|nocache|rnd|rand|random|k|key|sid|session\w*)$")
+
+
+def klic_kamery(c):
+    """stream + výběr: z jednoho kanálu/stránky (ytkanal match, regex) bývá víc různých kamer"""
+    k = klic_streamu(c.get("source"))
+    return k and "%s|%s|%s" % (k, " ".join((c.get("match") or "").lower().split()), (c.get("regex") or "").strip())
+
+
+def stejny_stream(lst, c, krome=()):
+    """kamera ze seznamu se stejným streamem i výběrem (jiné id než krome) nebo None; c = kamera nebo jen adresa"""
+    k = klic_kamery({"source": c} if isinstance(c, str) else c)
+    if not k:
+        return None
+    return next((x for x in lst if x["id"] not in krome and klic_kamery(x) == k), None)
+
+
+def duplicity(lst):
+    """skupiny id se stejným streamem i výběrem (jen kamery se zapnutým i vypnutým stavem dohromady)"""
+    sk = {}
+    for x in lst:
+        k = klic_kamery(x)
+        if k:
+            sk.setdefault(k, []).append(x["id"])
+    return [v for v in sk.values() if len(v) > 1]

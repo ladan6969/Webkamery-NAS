@@ -32,7 +32,7 @@ def pridat():
     finally:
         p.close()
     if r.get("uz_byla"):
-        api.oznam("Tahle kamera už na serveru je: %s" % r["name"])
+        d.ok(api.NAZEV, "Stejný stream už na serveru je jako kamera „%s“ (%s) – nová se nepřidala.%s" % (r["name"], r["id"], " Je v ⭐ Oblíbených." if obl else ""))
     elif r.get("ulozeno"):
         d.ok(api.NAZEV, "Kamera „%s“ hraje (%s) a je přidaná." % (r["name"], r.get("resolution") or r.get("type") or "ok"))
     else:

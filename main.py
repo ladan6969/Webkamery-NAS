@@ -426,6 +426,7 @@ async def api_cams(request: Request):
     ids = {c["id"] for c in cams}
     return {"cams": cams, "state": s["cams"], "cache": cache.snapshot(), "last_check": s["last_check"],
             "zmeny": {k: v for k, v in resolver.zmeny.items() if k in ids},
+            "duplicity": store.duplicity(cams),       # DUPLICITY_V1: stejný stream i výběr u víc kamer
             "kontrola": checker.running, "dead_after": CFG["dead_after"], "zeme": zeme.ZEME, "group_by": CFG["group_by"],
             "odkazy": {"Playlist Kodi": "%s/playlist.m3u?client=kodi&k=%s" % (b, k), "Playlist VLC": "%s/playlist.m3u?client=vlc&k=%s" % (b, k),
                        "Playlist Enigma2": "%s/playlist.m3u?client=e2&k=%s" % (b, k), "Bouquet Enigma2": "%s/bouquet.tv?k=%s" % (b, k),
@@ -458,6 +459,9 @@ async def api_ulozit(request: Request):
     c = _cista_kamera(d)
     lst = store.cams()
     puvodni = d.get("puvodni_id")
+    stejna = store.stejny_stream(lst, c, (c["id"], puvodni))
+    if stejna and not d.get("i_tak"):           # DUPLICITY_V1: stejný stream už má jiná kamera
+        return JSONResponse({"ok": False, "stejna": {"id": stejna["id"], "name": stejna["name"]}}, 409)
     if "oblibena" not in d:                     # formulář hvězdičku neposílá – zachovat
         c["oblibena"] = any(x.get("oblibena") for x in lst if x["id"] in (c["id"], puvodni))
     lst = [x for x in lst if x["id"] not in (c["id"], puvodni)] + [c]
@@ -561,7 +565,7 @@ async def api_kodi_pridat(request: Request):
     if not name:
         raise HTTPException(400, "chybí název")
     lst = store.cams()
-    stejna = next((x for x in lst if x["source"].strip() == src), None)
+    stejna = store.stejny_stream(lst, src)
     if stejna:
         if not stejna["enabled"] or (d.get("oblibena") and not stejna.get("oblibena")):
             stejna["enabled"] = True
@@ -626,6 +630,9 @@ async def api_test(request: Request):
         os.unlink(tmp)
     cache.drop(c["id"]) if c["id"] == "test" else None
     r.pop("url", None)
+    stejna = store.stejny_stream(store.cams(), c, (c["id"], d.get("puvodni_id")))
+    if stejna:
+        r["stejna"] = {"id": stejna["id"], "name": stejna["name"]}
     return r
 
 

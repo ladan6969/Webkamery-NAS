@@ -64016,5 +64016,37 @@
   "regex": "",
   "page": "",
   "note": ""
+ },
+ {
+  "id": "chmi-praded",
+  "name": "Praděd – ČHMÚ",
+  "group": "Moravskoslezský kraj",
+  "country": "CZ",
+  "category": "počasí",
+  "source": "https://produkty.chmi.cz/webkamery/input_data/kam/praded.jpg",
+  "type": "snimek",
+  "headers": {},
+  "mode": "auto",
+  "enabled": true,
+  "regex": "",
+  "match": "",
+  "page": "https://produkty.chmi.cz/webkamery/webcamDetail.php?cam=praded",
+  "note": "ČHMÚ (CC BY 4.0), 1491 m n. m., výhled JZ – snímek po několika minutách"
+ },
+ {
+  "id": "praha-hlavni-nadrazi1",
+  "name": "Praha - Hlavní nádraží 1",
+  "group": "Středočeský kraj",
+  "country": "CZ",
+  "category": "doprava",
+  "source": "https://www.youtube.com/watch?v=tmlE1ct0cYk",
+  "type": "auto",
+  "match": "",
+  "headers": {},
+  "mode": "auto",
+  "enabled": true,
+  "regex": "",
+  "page": "",
+  "note": ""
  }
 ]

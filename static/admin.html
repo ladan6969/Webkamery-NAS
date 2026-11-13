@@ -100,7 +100,7 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 
 <div class="karta filtry">
 <select id="fStav" onchange="vykresli(1)"><option value="ok">Stav: funkční (OK + pomalé)</option><option value="">Stav: vše</option>
-  <option value="mrtvá">nefunkční</option><option value="nic">neověřené</option><option value="skryta">skryté (3× v řadě)</option><option value="zmena">samo přepnuté</option><option value="oblibene">⭐ oblíbené</option><option value="vyp">vypnuté</option></select>
+  <option value="mrtvá">nefunkční</option><option value="nic">neověřené</option><option value="skryta">skryté (3× v řadě)</option><option value="zmena">samo přepnuté</option><option value="dup">duplicitní stream</option><option value="oblibene">⭐ oblíbené</option><option value="vyp">vypnuté</option></select>
 <select id="fKat" onchange="vykresli(1)"></select>
 <select id="fZeme" onchange="vykresli(1)"></select>
 <select id="fTema" onchange="vykresli(1)"></select>
@@ -175,7 +175,9 @@ function dlazdice() {
     `<div class="dl ${tr}${akt === f ? ' akt' : ''}" onclick="filtrStav('${f}')"><b>${pocet}</b><span>${popis}</span></div>`).join('');
 }
 function filtrStav(f) { document.getElementById('fStav').value = f; vykresli(1); }
+let DUP = {};
 function varovani() {
+  DUP = {}; (D.duplicity || []).forEach((sk, i) => sk.forEach(id => DUP[id] = i));
   const skryte = D.cams.filter(c => c.enabled && ((D.state[c.id] || {}).fail_streak || 0) >= D.dead_after);
   const jm = Object.fromEntries(D.cams.map(c => [c.id, c.name]));
   const zm = Object.entries(D.zmeny || {});
@@ -184,6 +186,11 @@ function varovani() {
     <button class="btn" onclick="filtrStav('skryta')">Ukázat je</button></div>`;
   if (zm.length) h += `<div style="margin-top:8px">↻ <b>${zm.length} kamer se samo přepnulo na jiný přenos</b> (od spuštění služby) – zkontroluj je a uprav zdroj na kanál (typ ytkanal):<ul>` +
     zm.map(([id, z]) => `<li><b>${esc(jm[id] || id)}</b> – ${esc(z.proc)} ${esc(z.kdy)}, hraje „${esc(z.nazev)}“ · <a href="${esc(z.kanal)}" target="_blank">kanál</a></li>`).join('') + '</ul></div>';
+  const dup = D.duplicity || [];
+  if (dup.length) h += `<div style="margin-top:8px">⧉ <b>${dup.length}× stejný stream u víc kamer</b> (${dup.reduce((n, sk) => n + sk.length - 1, 0)} navíc) – v TV se stejná kamera ukáže víckrát, nadbytečnou smaž nebo vypni.
+    <button class="btn" onclick="filtrStav('dup')">Ukázat je</button><ul>` +
+    dup.slice(0, 8).map(sk => '<li>' + sk.map(id => `<a href="#" onclick="uprav('${esc(id)}');return false">${esc(jm[id] || id)}</a> <span class="sed">(${esc(id)})</span>`).join(' = ') + '</li>').join('') +
+    (dup.length > 8 ? `<li class="sed">… a dalších ${dup.length - 8}</li>` : '') + '</ul></div>';
   const el = document.getElementById('varovani');
   el.innerHTML = h; el.style.display = h ? '' : 'none';
 }
@@ -251,6 +258,7 @@ function vykresli(strana) {
   const NA_STRANU = POHLED === 'mriz' ? 60 : 100;
   const vys = D.cams.filter(c => {
     const st = stavKamery(c);
+    if (f('fStav') === 'dup') { if (DUP[c.id] === undefined) return false; } else
     if (f('fStav') === 'ok' ? !(st === 'ok' || st === 'pomalá') : f('fStav') === 'zmena' ? !(D.zmeny && D.zmeny[c.id]) : f('fStav') === 'oblibene' ? !c.oblibena : (f('fStav') && st !== f('fStav'))) return false;
     if (f('fKat') && c._kat !== f('fKat')) return false;
     if (f('fZeme') && zemeN(c) !== f('fZeme')) return false;
@@ -259,7 +267,7 @@ function vykresli(strana) {
     if (f('fKval') && kvalita(D.state[c.id] || {}) !== f('fKval')) return false;
     if (q && !(c.name + ' ' + c.id).toLowerCase().includes(q)) return false;
     return true;
-  }).sort((a, b) => (a._kat.startsWith('Česko') ? 0 : 1) - (b._kat.startsWith('Česko') ? 0 : 1) ||
+  }).sort((a, b) => f('fStav') === 'dup' ? DUP[a.id] - DUP[b.id] || a.id.localeCompare(b.id) : (a._kat.startsWith('Česko') ? 0 : 1) - (b._kat.startsWith('Česko') ? 0 : 1) ||
                     (a._kat + '\u0000' + a.name).localeCompare(b._kat + '\u0000' + b.name, 'cs'));
   const stran = Math.max(1, Math.ceil(vys.length / NA_STRANU)); strana = Math.min(strana, stran);
   const cast = vys.slice((strana - 1) * NA_STRANU, strana * NA_STRANU);
@@ -352,14 +360,26 @@ async function otestovat() {
   try {
     const d = formData(); if (!d.id) d.id = 'test';
     b.disabled = true; v.innerHTML = '<span class="sed">Testuji (resolve, živost, ffprobe, náhled) – až 1 min…</span>';
+    d.puvodni_id = puvodni;
     const r = await api('test', {method: 'POST', body: JSON.stringify(d)});
-    v.innerHTML = r.ok ? `<span class="st ${esc(r.status)}">✔ ${esc(r.status)}</span> · typ ${esc(r.type)} · ${esc(r.resolution)} · ${r.fps} fps · ${esc(r.codec)} · start ${r.seconds} s` +
-      (r.thumb ? `<img src="${r.thumb}">` : '<div class="sed">náhled se nepovedl</div>') : `<span class="st mrtvá">✘ nejde</span><div class="sed">${esc(r.error)}</div>`;
+    v.innerHTML = (r.stejna ? `<div class="st mrtvá">⚠ Stejný stream už má kamera „${esc(r.stejna.name)}“ (${esc(r.stejna.id)})</div>` : '') + (r.ok ? `<span class="st ${esc(r.status)}">✔ ${esc(r.status)}</span> · typ ${esc(r.type)} · ${esc(r.resolution)} · ${r.fps} fps · ${esc(r.codec)} · start ${r.seconds} s` +
+      (r.thumb ? `<img src="${r.thumb}">` : '<div class="sed">náhled se nepovedl</div>') : `<span class="st mrtvá">✘ nejde</span><div class="sed">${esc(r.error)}</div>`);
   } catch (e) { v.innerHTML = '<span class="st mrtvá">' + esc(e.message || e) + '</span>'; }
   b.disabled = false;
 }
+function hledatId(id) { zavrit(); document.getElementById('fHledat').value = id; vykresli(1); }
 async function ulozit() {
-  try { const d = formData(); d.puvodni_id = puvodni; await api('cams', {method: 'POST', body: JSON.stringify(d)}); zavrit(); nacti(); }
+  try {
+    const d = formData(); d.puvodni_id = puvodni;
+    let r = await fetch('api/cams', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(d)});
+    if (r.status === 409) {                    // DUPLICITY_V1: stejný stream už má jiná kamera
+      const x = (await r.json()).stejna;
+      if (!confirm(`Stejný stream už má kamera „${x.name}“ (${x.id}).\n\nUložit i tak jako další kameru?`)) { hledatId(x.id); return; }
+      d.i_tak = true; await api('cams', {method: 'POST', body: JSON.stringify(d)});
+    } else if (r.status === 401) { location.href = 'login'; return; }
+    else if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'HTTP ' + r.status); }
+    zavrit(); nacti();
+  }
   catch (e) { alert(e.message || e); }
 }
 async function oblibena(id) {
