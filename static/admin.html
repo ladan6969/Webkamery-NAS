@@ -184,8 +184,10 @@ function varovani() {
   let h = '';
   if (skryte.length) h += `<div>⚠ <b>${skryte.length} kamer je skrytých</b> – ${D.dead_after} dny v řadě nejdou, v playlistu nejsou.
     <button class="btn" onclick="filtrStav('skryta')">Ukázat je</button></div>`;
-  if (zm.length) h += `<div style="margin-top:8px">↻ <b>${zm.length} kamer se samo přepnulo na jiný přenos</b> (od spuštění služby) – zkontroluj je a uprav zdroj na kanál (typ ytkanal):<ul>` +
-    zm.map(([id, z]) => `<li><b>${esc(jm[id] || id)}</b> – ${esc(z.proc)} ${esc(z.kdy)}, hraje „${esc(z.nazev)}“ · <a href="${esc(z.kanal)}" target="_blank">kanál</a></li>`).join('') + '</ul></div>';
+  if (zm.length) h += `<div style="margin-top:8px">↻ <b>${zm.length} kamer se samo přepnulo na jiný přenos</b> (od spuštění služby) – zkontroluj je a uprav zdroj na kanál (typ ytkanal).
+    <button class="btn" onclick="skrytZmeny()" title="Skrýt všechna upozornění na přepnutí (objeví se znovu, až se kamera přepne příště)">Skrýt</button><ul>` +
+    zm.map(([id, z]) => `<li><b>${esc(jm[id] || id)}</b> – ${esc(z.proc)} ${esc(z.kdy)}, hraje „${esc(z.nazev)}“ · <a href="${esc(z.kanal)}" target="_blank">kanál</a>
+      · <a href="#" onclick="skrytZmeny('${esc(id)}');return false" title="Vyřízeno – skrýt">✕ skrýt</a></li>`).join('') + '</ul></div>';
   const dup = D.duplicity || [];
   if (dup.length) h += `<div style="margin-top:8px">⧉ <b>${dup.length}× stejný stream u víc kamer</b> (${dup.reduce((n, sk) => n + sk.length - 1, 0)} navíc) – v TV se stejná kamera ukáže víckrát, nadbytečnou smaž nebo vypni.
     <button class="btn" onclick="filtrStav('dup')">Ukázat je</button><ul>` +
@@ -386,6 +388,11 @@ async function oblibena(id) {
   await api('cams/' + encodeURIComponent(id) + '/oblibena', {method: 'POST'});
   const c = D.cams.find(x => x.id === id); if (c) c.oblibena = !c.oblibena;   // bez načítání celého seznamu
   vykresli(window._strana || 1);
+}
+async function skrytZmeny(id) {
+  await api('zmeny/skryt', {method: 'POST', body: JSON.stringify(id ? {id} : {})});
+  if (id) delete D.zmeny[id]; else D.zmeny = {};
+  varovani(); dlazdice();
 }
 async function prepni(id) { await api('cams/' + encodeURIComponent(id) + '/prepnout', {method: 'POST'}); nacti(); }
 async function smaz(id) { if (confirm('Smazat kameru ' + id + '?')) { await api('cams/' + encodeURIComponent(id), {method: 'DELETE'}); nacti(); } }

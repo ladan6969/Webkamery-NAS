@@ -1,0 +1,894 @@
+{
+ "popis": "hromadné změny pro tools/doplnit_kamery.py (KAMERY_ZMENY_V1)",
+ "smazat": [
+  "cerveny-kostelec-sportovni-hala",
+  "gb-uk-dawlish",
+  "gb-uk-westward",
+  "ru-1-11",
+  "ru-1-2",
+  "ru-10-2",
+  "ru-11-4",
+  "ru-15",
+  "ru-16-3",
+  "ru-17",
+  "ru-18",
+  "ru-2-4",
+  "ru-2-6",
+  "ru-3-8",
+  "ru-4-2",
+  "ru-4-8",
+  "ru-5-8",
+  "ru-8-5",
+  "ru-9-3"
+ ],
+ "prejmenovat": {
+  "nevskiy-avenue-st-petersburg-russia": {
+   "z": "Nevskiy avenue St. Petersburg Russia. Невский пр. Санкт-Петербург, Гос",
+   "na": "Nevskiy avenue St. Petersburg Russia"
+  },
+  "nevskiy-avenue-st-petersburg-russia-": {
+   "z": "Nevskiy avenue St. Petersburg Russia Anichkov Palace Невский пр. Аничк",
+   "na": "Nevskiy avenue St. Petersburg Russia Anichkov Palace"
+  },
+  "ex-video-camera-saint-petersburg-rus": {
+   "z": "Ex video CAMERA Saint Petersburg, Russia. Palace Bridge Дворцовый мост",
+   "na": "Ex video CAMERA Saint Petersburg, Russia. Palace Bridge"
+  },
+  "us-usa": {
+   "z": "USA - Кормушка",
+   "na": "USA – krmítko"
+  },
+  "gb-uk": {
+   "z": "UK - Пингвины",
+   "na": "UK – tučňáci"
+  },
+  "gb-uk-2": {
+   "z": "UK - Пингвины",
+   "na": "UK – tučňáci"
+  },
+  "gb-uk-3": {
+   "z": "UK - Фламинго",
+   "na": "UK – plameňáci"
+  },
+  "us-2": {
+   "z": "Пингвины 2",
+   "na": "Tučňáci 2"
+  },
+  "ru-5ad79df289937-streamlock-net-secr": {
+   "z": "Рифы",
+   "na": "Korálové útesy"
+  },
+  "gr-1": {
+   "z": "Греция 1",
+   "na": "Řecko 1"
+  },
+  "gr-2": {
+   "z": "Греция 2",
+   "na": "Řecko 2"
+  },
+  "kz-1": {
+   "z": "Алматы - ГК Шымбулак 1",
+   "na": "Almaty – Šymbulak 1"
+  },
+  "kz-4": {
+   "z": "Алматы - ГК Шымбулак 4",
+   "na": "Almaty – Šymbulak 4"
+  },
+  "kz-5": {
+   "z": "Алматы - ГК Шымбулак 5",
+   "na": "Almaty – Šymbulak 5"
+  },
+  "ru-2": {
+   "z": "Астрахань 2",
+   "na": "Astrachaň 2"
+  },
+  "ru-2-2": {
+   "z": "Астрахань 2",
+   "na": "Astrachaň 2"
+  },
+  "ru-5": {
+   "z": "Астрахань 5",
+   "na": "Astrachaň 5"
+  },
+  "ru-5-2": {
+   "z": "Астрахань 5",
+   "na": "Astrachaň 5"
+  },
+  "ru-8": {
+   "z": "Астрахань 8",
+   "na": "Astrachaň 8"
+  },
+  "ru-bm-isc-irk-ru-8085-hls": {
+   "z": "Байкальский Музей",
+   "na": "Bajkalské muzeum"
+  },
+  "ru-3": {
+   "z": "Байкальский Музей 3",
+   "na": "Bajkalské muzeum 3"
+  },
+  "ru-5-3": {
+   "z": "Байкальский Музей 5",
+   "na": "Bajkalské muzeum 5"
+  },
+  "ru-6": {
+   "z": "Байкальский Музей 6",
+   "na": "Bajkalské muzeum 6"
+  },
+  "ru-7": {
+   "z": "Байкальский Музей 7",
+   "na": "Bajkalské muzeum 7"
+  },
+  "ru-8-2": {
+   "z": "Байкальский Музей 8",
+   "na": "Bajkalské muzeum 8"
+  },
+  "rs-1": {
+   "z": "Белград 1",
+   "na": "Bělehrad 1"
+  },
+  "rs-2": {
+   "z": "Белград 2",
+   "na": "Bělehrad 2"
+  },
+  "rs-3": {
+   "z": "Белград 3",
+   "na": "Bělehrad 3"
+  },
+  "rs-4": {
+   "z": "Белград 4",
+   "na": "Bělehrad 4"
+  },
+  "rs-5": {
+   "z": "Белград 5",
+   "na": "Bělehrad 5"
+  },
+  "rs-6": {
+   "z": "Белград 6",
+   "na": "Bělehrad 6"
+  },
+  "rs-8": {
+   "z": "Белград 8",
+   "na": "Bělehrad 8"
+  },
+  "rs-9": {
+   "z": "Белград 9",
+   "na": "Bělehrad 9"
+  },
+  "rs-11": {
+   "z": "Белград 11",
+   "na": "Bělehrad 11"
+  },
+  "rs-12": {
+   "z": "Белград 12",
+   "na": "Bělehrad 12"
+  },
+  "rs-13": {
+   "z": "Белград 13",
+   "na": "Bělehrad 13"
+  },
+  "rs-14": {
+   "z": "Белград 14",
+   "na": "Bělehrad 14"
+  },
+  "rs-15": {
+   "z": "Белград 15",
+   "na": "Bělehrad 15"
+  },
+  "rs-16": {
+   "z": "Белград 16",
+   "na": "Bělehrad 16"
+  },
+  "rs-17": {
+   "z": "Белград 17",
+   "na": "Bělehrad 17"
+  },
+  "ru-3-2": {
+   "z": "Белоярский 3",
+   "na": "Bělojarskij 3"
+  },
+  "ru-7-2": {
+   "z": "Белоярский 7",
+   "na": "Bělojarskij 7"
+  },
+  "ru-2-3": {
+   "z": "Верхняя Салда 2",
+   "na": "Verchňaja Salda 2"
+  },
+  "ru-4": {
+   "z": "Верхняя Салда 4",
+   "na": "Verchňaja Salda 4"
+  },
+  "ru-6-2": {
+   "z": "Верхняя Салда 6",
+   "na": "Verchňaja Salda 6"
+  },
+  "ru-7-3": {
+   "z": "Верхняя Салда 7",
+   "na": "Verchňaja Salda 7"
+  },
+  "ru-1": {
+   "z": "Вологда 1",
+   "na": "Vologda 1"
+  },
+  "ru-2-5": {
+   "z": "Вологда 2",
+   "na": "Vologda 2"
+  },
+  "ru-1-3": {
+   "z": "Кингисепп 1",
+   "na": "Kingisepp 1"
+  },
+  "ru-2-7": {
+   "z": "Кингисепп 2",
+   "na": "Kingisepp 2"
+  },
+  "ru-4-3": {
+   "z": "Кингисепп 4",
+   "na": "Kingisepp 4"
+  },
+  "ru-1-4": {
+   "z": "Киржач 1",
+   "na": "Kiržač 1"
+  },
+  "ru-2-8": {
+   "z": "Киржач 2",
+   "na": "Kiržač 2"
+  },
+  "ru-3-3": {
+   "z": "Киржач 3",
+   "na": "Kiržač 3"
+  },
+  "ru-4-4": {
+   "z": "Киржач 4",
+   "na": "Kiržač 4"
+  },
+  "ru-5-4": {
+   "z": "Киржач 5",
+   "na": "Kiržač 5"
+  },
+  "ru-6-3": {
+   "z": "Киржач 6",
+   "na": "Kiržač 6"
+  },
+  "ru-7-4": {
+   "z": "Киржач 7",
+   "na": "Kiržač 7"
+  },
+  "ru-1-5": {
+   "z": "Красноярск - Бобровый Лог 1",
+   "na": "Krasnojarsk – Bobrovyj Log 1"
+  },
+  "ru-6-4": {
+   "z": "Красноярск - Бобровый Лог 6",
+   "na": "Krasnojarsk – Bobrovyj Log 6"
+  },
+  "ru-8-3": {
+   "z": "Красноярск - Бобровый Лог 8",
+   "na": "Krasnojarsk – Bobrovyj Log 8"
+  },
+  "ru-9": {
+   "z": "Красноярск - Бобровый Лог 9",
+   "na": "Krasnojarsk – Bobrovyj Log 9"
+  },
+  "ru-2-9": {
+   "z": "Кузбасс 2",
+   "na": "Kuzbas 2"
+  },
+  "ru-s1-dcdn-lt-vilnius-stream": {
+   "z": "Литва - Вильнюс",
+   "na": "Litva – Vilnius"
+  },
+  "ru-ignet-lt-8888-test": {
+   "z": "Литва - Игналина",
+   "na": "Litva – Ignalina"
+  },
+  "ua-1": {
+   "z": "Львов - Церковь 1",
+   "na": "Lvov – kostel 1"
+  },
+  "ua-2": {
+   "z": "Львов - Церковь 2",
+   "na": "Lvov – kostel 2"
+  },
+  "ru-wowza01-newmedia-lu-1935-cita-a1": {
+   "z": "Люксембург",
+   "na": "Lucembursko"
+  },
+  "ru-wowza01-newmedia-lu-1935-cita-a1-2": {
+   "z": "Люксембург",
+   "na": "Lucembursko"
+  },
+  "ru-live-edge-rtl-lu-cita-a1": {
+   "z": "Люксембург",
+   "na": "Lucembursko"
+  },
+  "ru-live-edge-rtl-lu-cita-a1-2": {
+   "z": "Люксембург",
+   "na": "Lucembursko"
+  },
+  "lu-2": {
+   "z": "Люксембург 2",
+   "na": "Lucembursko 2"
+  },
+  "lu-2-2": {
+   "z": "Люксембург 2",
+   "na": "Lucembursko 2"
+  },
+  "lu-3": {
+   "z": "Люксембург 3",
+   "na": "Lucembursko 3"
+  },
+  "lu-3-2": {
+   "z": "Люксембург 3",
+   "na": "Lucembursko 3"
+  },
+  "lu-4": {
+   "z": "Люксембург 4",
+   "na": "Lucembursko 4"
+  },
+  "lu-4-2": {
+   "z": "Люксембург 4",
+   "na": "Lucembursko 4"
+  },
+  "lu-5": {
+   "z": "Люксембург 5",
+   "na": "Lucembursko 5"
+  },
+  "lu-5-2": {
+   "z": "Люксембург 5",
+   "na": "Lucembursko 5"
+  },
+  "lu-6": {
+   "z": "Люксембург 6",
+   "na": "Lucembursko 6"
+  },
+  "lu-6-2": {
+   "z": "Люксембург 6",
+   "na": "Lucembursko 6"
+  },
+  "lu-7": {
+   "z": "Люксембург 7",
+   "na": "Lucembursko 7"
+  },
+  "lu-7-2": {
+   "z": "Люксембург 7",
+   "na": "Lucembursko 7"
+  },
+  "lu-8": {
+   "z": "Люксембург 8",
+   "na": "Lucembursko 8"
+  },
+  "lu-8-2": {
+   "z": "Люксембург 8",
+   "na": "Lucembursko 8"
+  },
+  "ru-1-6": {
+   "z": "Междуреченск 1",
+   "na": "Mežduričensk 1"
+  },
+  "ru-1-7": {
+   "z": "Междуреченск 1",
+   "na": "Mežduričensk 1"
+  },
+  "ru-4-5": {
+   "z": "Междуреченск 4",
+   "na": "Mežduričensk 4"
+  },
+  "ru-5-5": {
+   "z": "Междуреченск 5",
+   "na": "Mežduričensk 5"
+  },
+  "ru-6-5": {
+   "z": "Междуреченск 6",
+   "na": "Mežduričensk 6"
+  },
+  "ru-7-5": {
+   "z": "Междуреченск 7",
+   "na": "Mežduričensk 7"
+  },
+  "ru-8-4": {
+   "z": "Междуреченск 8",
+   "na": "Mežduričensk 8"
+  },
+  "ru-11": {
+   "z": "Междуреченск 11",
+   "na": "Mežduričensk 11"
+  },
+  "ru-11-2": {
+   "z": "Междуреченск 11",
+   "na": "Mežduričensk 11"
+  },
+  "ru-12": {
+   "z": "Междуреченск 12",
+   "na": "Mežduričensk 12"
+  },
+  "ru-12-2": {
+   "z": "Междуреченск 12",
+   "na": "Mežduričensk 12"
+  },
+  "ru-14": {
+   "z": "Междуреченск 14",
+   "na": "Mežduričensk 14"
+  },
+  "ru-16": {
+   "z": "Междуреченск 16",
+   "na": "Mežduričensk 16"
+  },
+  "ru-2-10": {
+   "z": "Назарово 2",
+   "na": "Nazarovo 2"
+  },
+  "ru-3-4": {
+   "z": "Назарово 3",
+   "na": "Nazarovo 3"
+  },
+  "ru-6-6": {
+   "z": "Назарово 6",
+   "na": "Nazarovo 6"
+  },
+  "ru-1-8": {
+   "z": "Нелидово 1",
+   "na": "Nelidovo 1"
+  },
+  "ru-2-11": {
+   "z": "Нелидово 2",
+   "na": "Nelidovo 2"
+  },
+  "ru-3-5": {
+   "z": "Нелидово 3",
+   "na": "Nelidovo 3"
+  },
+  "ru-4-6": {
+   "z": "Нелидово 4",
+   "na": "Nelidovo 4"
+  },
+  "ru-5-6": {
+   "z": "Нелидово 5",
+   "na": "Nelidovo 5"
+  },
+  "ru-6162417352ffd-streamlock-net-ecom": {
+   "z": "Нидерланды - Морские котики",
+   "na": "Nizozemsko – lachtani"
+  },
+  "ru-1-9": {
+   "z": "Нидерланды 1",
+   "na": "Nizozemsko 1"
+  },
+  "ru-3-6": {
+   "z": "Нидерланды 3",
+   "na": "Nizozemsko 3"
+  },
+  "ru-10": {
+   "z": "Нидерланды 10",
+   "na": "Nizozemsko 10"
+  },
+  "ru-11-3": {
+   "z": "Нидерланды 11",
+   "na": "Nizozemsko 11"
+  },
+  "ru-13": {
+   "z": "Нидерланды 13",
+   "na": "Nizozemsko 13"
+  },
+  "ru-16-2": {
+   "z": "Нидерланды 16",
+   "na": "Nizozemsko 16"
+  },
+  "ru-13-2": {
+   "z": "Ноябрьск 13",
+   "na": "Nojabrsk 13"
+  },
+  "ru-3-7": {
+   "z": "Одинцово 3",
+   "na": "Odincovo 3"
+  },
+  "ru-1-10": {
+   "z": "Оренбург 1",
+   "na": "Orenburg 1"
+  },
+  "ru-2-12": {
+   "z": "Оренбург 2",
+   "na": "Orenburg 2"
+  },
+  "ru-4-7": {
+   "z": "Оренбург 4",
+   "na": "Orenburg 4"
+  },
+  "ru-6-7": {
+   "z": "Оренбург 6",
+   "na": "Orenburg 6"
+  },
+  "ru-7-6": {
+   "z": "Оренбург 7",
+   "na": "Orenburg 7"
+  },
+  "ru-9-2": {
+   "z": "Оренбург 9",
+   "na": "Orenburg 9"
+  },
+  "ru-2-13": {
+   "z": "Полевской 2",
+   "na": "Polevskoj 2"
+  },
+  "ru-6-8": {
+   "z": "Полевской Карла Маркса 6а",
+   "na": "Polevskoj – Karla Marxe 6a"
+  },
+  "ru-30": {
+   "z": "Полевской Коммунистическая 30",
+   "na": "Polevskoj – Komunističeskaja 30"
+  },
+  "ru-31-131-80-2-8080-polevskoj-2mkr-3": {
+   "z": "Полевской Перекресток",
+   "na": "Polevskoj – křižovatka"
+  },
+  "ru-31-131-80-2-8080-7e7cb479-4f36-4e": {
+   "z": "Полевской площадь Солдата",
+   "na": "Polevskoj – náměstí Vojáka"
+  },
+  "ru-kamera-task-gda-pl-k002-sdp": {
+   "z": "Польша - Гданьск",
+   "na": "Polsko – Gdaňsk"
+  },
+  "pl-2": {
+   "z": "Польша - Гданьск 2",
+   "na": "Polsko – Gdaňsk 2"
+  },
+  "ru-kamera-task-gda-pl-k015-sdp": {
+   "z": "Польша - Гдыня",
+   "na": "Polsko – Gdyně"
+  },
+  "pl-2-2": {
+   "z": "Польша - Гдыня 2",
+   "na": "Polsko – Gdyně 2"
+  },
+  "ru-kamera-task-gda-pl-mikoszewo-sdp": {
+   "z": "Польша - Микошево",
+   "na": "Polsko – Mikoszewo"
+  },
+  "ru-kamera-task-gda-pl-molo-sdp": {
+   "z": "Польша - Сопот",
+   "na": "Polsko – Sopoty"
+  },
+  "ru-cam-indikom-ru-hls": {
+   "z": "Пушкино",
+   "na": "Puškino"
+  },
+  "ru-5-7": {
+   "z": "Пушкино 5",
+   "na": "Puškino 5"
+  },
+  "ru-7-7": {
+   "z": "Симферополь 7",
+   "na": "Simferopol 7"
+  },
+  "se-1": {
+   "z": "Словакия 1",
+   "na": "Slovensko 1"
+  },
+  "sk-2": {
+   "z": "Словакия 2",
+   "na": "Slovensko 2"
+  },
+  "sk-6": {
+   "z": "Словакия 6",
+   "na": "Slovensko 6"
+  },
+  "sk-10": {
+   "z": "Словакия 10",
+   "na": "Slovensko 10"
+  },
+  "sk-11": {
+   "z": "Словакия 11",
+   "na": "Slovensko 11"
+  },
+  "sk-11-2": {
+   "z": "Словакия 11",
+   "na": "Slovensko 11"
+  },
+  "sk-12": {
+   "z": "Словакия 12",
+   "na": "Slovensko 12"
+  },
+  "sk-12-2": {
+   "z": "Словакия 12",
+   "na": "Slovensko 12"
+  },
+  "sk-13": {
+   "z": "Словакия 13",
+   "na": "Slovensko 13"
+  },
+  "sk-13-2": {
+   "z": "Словакия 13",
+   "na": "Slovensko 13"
+  },
+  "sk-14": {
+   "z": "Словакия 14",
+   "na": "Slovensko 14"
+  },
+  "se-16": {
+   "z": "Словакия 16",
+   "na": "Slovensko 16"
+  },
+  "se-17": {
+   "z": "Словакия 17",
+   "na": "Slovensko 17"
+  },
+  "se-18": {
+   "z": "Словакия 18",
+   "na": "Slovensko 18"
+  },
+  "se-19": {
+   "z": "Словакия 19",
+   "na": "Slovensko 19"
+  },
+  "sk-23": {
+   "z": "Словакия 23",
+   "na": "Slovensko 23"
+  },
+  "sk-25": {
+   "z": "Словакия 25",
+   "na": "Slovensko 25"
+  },
+  "ru-1-12": {
+   "z": "Ставрополь 1",
+   "na": "Stavropol 1"
+  },
+  "ru-3-9": {
+   "z": "Ставрополь 3",
+   "na": "Stavropol 3"
+  },
+  "ru-4-9": {
+   "z": "Ставрополь 4",
+   "na": "Stavropol 4"
+  },
+  "ru-5-9": {
+   "z": "Ставрополь 5",
+   "na": "Stavropol 5"
+  },
+  "ru-6-9": {
+   "z": "Ставрополь 6",
+   "na": "Stavropol 6"
+  },
+  "ru-7-8": {
+   "z": "Ставрополь 7",
+   "na": "Stavropol 7"
+  },
+  "ru-8-6": {
+   "z": "Ставрополь 8",
+   "na": "Stavropol 8"
+  },
+  "ru-9-4": {
+   "z": "Ставрополь 9",
+   "na": "Stavropol 9"
+  },
+  "ru-10-3": {
+   "z": "Ставрополь 10",
+   "na": "Stavropol 10"
+  },
+  "ru-11-5": {
+   "z": "Ставрополь 11",
+   "na": "Stavropol 11"
+  },
+  "ru-15-2": {
+   "z": "Ставрополь 15",
+   "na": "Stavropol 15"
+  },
+  "ru-16-4": {
+   "z": "Ставрополь 16",
+   "na": "Stavropol 16"
+  },
+  "ru-17-2": {
+   "z": "Ставрополь 17",
+   "na": "Stavropol 17"
+  },
+  "ru-18-2": {
+   "z": "Ставрополь 18",
+   "na": "Stavropol 18"
+  },
+  "ru-19": {
+   "z": "Ставрополь 19",
+   "na": "Stavropol 19"
+  },
+  "ru-20": {
+   "z": "Ставрополь 20",
+   "na": "Stavropol 20"
+  },
+  "ru-22": {
+   "z": "Ставрополь 22",
+   "na": "Stavropol 22"
+  },
+  "ru-5ad79df289937-streamlock-net-otte": {
+   "z": "США - Выдры",
+   "na": "USA – vydry"
+  },
+  "ru-zoocams-elpasozoo-org-zoocams-elp": {
+   "z": "США - Морской лев",
+   "na": "USA – lachtan"
+  },
+  "ru-zssd-platypus-hls-camzonecdn-com-": {
+   "z": "США - Утконос",
+   "na": "USA – ptakopysk"
+  },
+  "ru-cdn08-vtomske-ru-hls": {
+   "z": "Томск - Площадь Южная",
+   "na": "Tomsk – Jižní náměstí"
+  },
+  "ru-cdn08-vtomske-ru-hls-2": {
+   "z": "Томск - Река Томь",
+   "na": "Tomsk – řeka Tom"
+  },
+  "ru-1-13": {
+   "z": "Тулун 1",
+   "na": "Tulun 1"
+  },
+  "ru-2-14": {
+   "z": "Тулун 2",
+   "na": "Tulun 2"
+  },
+  "ru-3-10": {
+   "z": "Тулун 3",
+   "na": "Tulun 3"
+  },
+  "ru-4-10": {
+   "z": "Тулун 4",
+   "na": "Tulun 4"
+  },
+  "ru-5-10": {
+   "z": "Тулун 5",
+   "na": "Tulun 5"
+  },
+  "ru-7-9": {
+   "z": "Тулун 7",
+   "na": "Tulun 7"
+  },
+  "ru-8-7": {
+   "z": "Тулун 8",
+   "na": "Tulun 8"
+  },
+  "ru-9-5": {
+   "z": "Тулун 9",
+   "na": "Tulun 9"
+  },
+  "ru-10-4": {
+   "z": "Тулун 10",
+   "na": "Tulun 10"
+  },
+  "ru-11-6": {
+   "z": "Тулун 11",
+   "na": "Tulun 11"
+  },
+  "ru-12-3": {
+   "z": "Тулун 12",
+   "na": "Tulun 12"
+  },
+  "ru-13-3": {
+   "z": "Тулун 13",
+   "na": "Tulun 13"
+  },
+  "ru-14-2": {
+   "z": "Тулун 14",
+   "na": "Tulun 14"
+  },
+  "ru-15-3": {
+   "z": "Тулун 15",
+   "na": "Tulun 15"
+  },
+  "tr-12": {
+   "z": "Турция 12",
+   "na": "Turecko 12"
+  },
+  "tr-13": {
+   "z": "Турция 13",
+   "na": "Turecko 13"
+  },
+  "ru-4-11": {
+   "z": "Улан-Удэ 4",
+   "na": "Ulan-Ude 4"
+  },
+  "ru-1-14": {
+   "z": "Усинск 1",
+   "na": "Usinsk 1"
+  },
+  "ru-2-15": {
+   "z": "Усинск 2",
+   "na": "Usinsk 2"
+  },
+  "ru-3-11": {
+   "z": "Усинск 3",
+   "na": "Usinsk 3"
+  },
+  "ru-7-10": {
+   "z": "Франция 7",
+   "na": "Francie 7"
+  },
+  "ru-1-15": {
+   "z": "Херсон 1",
+   "na": "Cherson 1"
+  },
+  "ru-91-211-56-203-8081-sharipovo": {
+   "z": "Шарыпово",
+   "na": "Šarypovo"
+  },
+  "kz-1-2": {
+   "z": "Шахтинск 1",
+   "na": "Šachtinsk 1"
+  },
+  "kz-2": {
+   "z": "Шахтинск 2",
+   "na": "Šachtinsk 2"
+  },
+  "kz-3": {
+   "z": "Шахтинск 3",
+   "na": "Šachtinsk 3"
+  },
+  "ru-stream02-vikingsecurity-ee-1935-c": {
+   "z": "Эстония",
+   "na": "Estonsko"
+  },
+  "ru-2-4": {
+   "z": "Вологда 2",
+   "na": "Vologda 2"
+  },
+  "ru-1-2": {
+   "z": "Кингисепп 1",
+   "na": "Kingisepp 1"
+  },
+  "ru-2-6": {
+   "z": "Кингисепп 2",
+   "na": "Kingisepp 2"
+  },
+  "ru-4-2": {
+   "z": "Кингисепп 4",
+   "na": "Kingisepp 4"
+  },
+  "ru-1-11": {
+   "z": "Ставрополь 1",
+   "na": "Stavropol 1"
+  },
+  "ru-3-8": {
+   "z": "Ставрополь 3",
+   "na": "Stavropol 3"
+  },
+  "ru-4-8": {
+   "z": "Ставрополь 4",
+   "na": "Stavropol 4"
+  },
+  "ru-5-8": {
+   "z": "Ставрополь 5",
+   "na": "Stavropol 5"
+  },
+  "ru-8-5": {
+   "z": "Ставрополь 8",
+   "na": "Stavropol 8"
+  },
+  "ru-9-3": {
+   "z": "Ставрополь 9",
+   "na": "Stavropol 9"
+  },
+  "ru-10-2": {
+   "z": "Ставрополь 10",
+   "na": "Stavropol 10"
+  },
+  "ru-11-4": {
+   "z": "Ставрополь 11",
+   "na": "Stavropol 11"
+  },
+  "ru-15": {
+   "z": "Ставрополь 15",
+   "na": "Stavropol 15"
+  },
+  "ru-16-3": {
+   "z": "Ставрополь 16",
+   "na": "Stavropol 16"
+  },
+  "ru-17": {
+   "z": "Ставрополь 17",
+   "na": "Stavropol 17"
+  },
+  "ru-18": {
+   "z": "Ставрополь 18",
+   "na": "Stavropol 18"
+  }
+ }
+}

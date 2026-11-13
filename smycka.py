@@ -8,8 +8,13 @@ CASOSBER_V1 (12. 11. 2026): kamery ČHMÚ – místo stojícího obrázku časos
 (getWebcamImages.php, snímek po 10 min), na konci chvíli drží nejnovější snímek. Zapíná config „casosber“
 {"zapnuto": true, "hodin": 6, "kamery": [] = všechny ČHMÚ}; bez něj (výchozí) vše jako dřív. Snímky se drží v
 KOREN/snimky.casosber/<kamera>/ a stahují se jen nové. Když časosběr selže, použije se obyčejný snímek.
+CASOSBER_SBER_V1 (13. 11. 2026): ostatní snímkové kamery archiv nemají → snímky sbírá služba sama (SBER/<kamera>/,
+přežije restart) po 10 min, jen u oblíbených a sledovaných za posledních 7 dní (main._sber_casosberu); snímek stažený
+při přehrání se uloží taky. Časosběr se ukáže, jakmile jsou aspoň 3 různé snímky, do té doby obyčejný snímek.
 """
 import asyncio
+import hashlib
+import json
 import logging
 import math
 import os
@@ -22,6 +27,9 @@ import hls
 log = logging.getLogger("webcams")
 
 KOREN = "/tmp/webcams-smycka"
+SBER = None                     # trvalá složka sebraných snímků (nastaví main.py: store.path("casosber"))
+SBER_KROK = 600                 # s mezi sebranými snímky
+SLEDOVANE_DNI = 7
 OBNOVA = 600
 OBNOVA_SNIMEK = 120
 _stav, _zamky = {}, {}
@@ -38,9 +46,9 @@ def _zamek(cid):
 
 
 def casosber_hodin(cfg, cid, url):
-    """počet hodin časosběru pro tuto kameru, nebo 0 (vypnuto / není ČHMÚ)"""
+    """počet hodin časosběru pro tuto snímkovou kameru, nebo 0 (vypnuto)"""
     c = cfg.get("casosber") or {}
-    if not c.get("zapnuto") or not CHMI_RE.match(url.split("?")[0]):
+    if not c.get("zapnuto"):
         return 0
     if c.get("kamery") and cid not in c["kamery"]:
         return 0
@@ -95,33 +103,125 @@ async def _casosber_seznam(cfg, url, hodin, d):
     return sez
 
 
+def je_chmi(url):
+    return bool(CHMI_RE.match(url.split("?")[0]))
+
+
+def _sber_dir(cid):
+    return os.path.join(SBER, cid) if SBER and re.fullmatch(r"[a-z0-9_-]+", cid) else None
+
+
+def sber_uloz(cid, data, hodin):
+    """uloží sebraný snímek (YYYYMMDD.HHMM.jpg); stejný jako poslední se neukládá; starší než `hodin` h smaže"""
+    d = _sber_dir(cid)
+    if not d or not data or len(data) < 2000:
+        return False
+    os.makedirs(d, exist_ok=True)
+    mam = sorted(f for f in os.listdir(d) if CAS_SNIMEK.match(f))
+    ted = time.time()
+    for f in mam:
+        m = CAS_SNIMEK.match(f)
+        if time.mktime(time.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M")) < ted - hodin * 3600 - 300:
+            try:
+                os.unlink(os.path.join(d, f))
+            except OSError:
+                pass
+    mam = sorted(f for f in os.listdir(d) if CAS_SNIMEK.match(f))
+    h = hashlib.md5(data).hexdigest()
+    if mam:
+        posl = mam[-1]
+        m = CAS_SNIMEK.match(posl)
+        if ted - time.mktime(time.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M")) < SBER_KROK - 60:
+            return False                        # nedávno uloženo
+        try:
+            if hashlib.md5(open(os.path.join(d, posl), "rb").read()).hexdigest() == h:
+                return False                    # kamera se neobnovila
+        except OSError:
+            pass
+    cil = os.path.join(d, time.strftime("%Y%m%d.%H%M", time.localtime(ted)) + ".jpg")
+    with open(cil + ".tmp", "wb") as fh:
+        fh.write(data)
+    os.replace(cil + ".tmp", cil)
+    return True
+
+
+def _sber_seznam(cid, d):
+    sd = _sber_dir(cid)
+    mam = sorted(f for f in os.listdir(sd) if CAS_SNIMEK.match(f)) if sd and os.path.isdir(sd) else []
+    if len(mam) < 3:
+        raise RuntimeError("časosběr: zatím málo sebraných snímků (%d)" % len(mam))
+    sez = os.path.join(d, "snimky.txt")
+    with open(sez, "w") as fh:
+        for i, f in enumerate(mam):
+            fh.write("file '%s'\nduration %s\n" % (os.path.join(sd, f), CAS_DRZET if i == len(mam) - 1 else "%.4f" % (1 / CAS_FPS)))
+        fh.write("file '%s'\n" % os.path.join(sd, mam[-1]))
+    return sez
+
+
+def _sledovane_soubor():
+    return os.path.join(SBER, "sledovane.json") if SBER else None
+
+
+def sledovane():
+    """{kamera: čas posledního přehrání} za posledních SLEDOVANE_DNI dní"""
+    try:
+        d = json.load(open(_sledovane_soubor()))
+    except (OSError, ValueError, TypeError):
+        return {}
+    hranice = time.time() - SLEDOVANE_DNI * 86400
+    return {k: v for k, v in d.items() if isinstance(v, (int, float)) and v > hranice}
+
+
+def zaznamenej_sledovani(cid):
+    if not SBER:
+        return
+    d = sledovane()
+    if time.time() - d.get(cid, 0) < 3600:
+        return
+    d[cid] = time.time()
+    os.makedirs(SBER, exist_ok=True)
+    p = _sledovane_soubor()
+    with open(p + ".tmp", "w") as fh:
+        json.dump(d, fh)
+    os.replace(p + ".tmp", p)
+
+
 async def priprav(cfg, cid, url, headers=None, snimek=False):
     hodin = casosber_hodin(cfg, cid, url) if snimek else 0
-    obnova = OBNOVA if hodin else OBNOVA_SNIMEK if snimek else OBNOVA
+    chmi = bool(hodin) and je_chmi(url)
+    if snimek:
+        zaznamenej_sledovani(cid)
     st = _stav.get(cid)
-    if st and time.time() - st["t"] < obnova:
+    if st and time.time() - st["t"] < st.get("obnova", OBNOVA):
         return st
     async with _zamek(cid):
         st = _stav.get(cid)
-        if st and time.time() - st["t"] < obnova:
+        if st and time.time() - st["t"] < st.get("obnova", OBNOVA):
             return st
         ver = str(int(time.time()))
         d = os.path.join(KOREN, cid, ver)
         os.makedirs(d, exist_ok=True)
         klip = os.path.join(d, "klip.mp4")
-        if hodin:
+        if chmi:
             try:
                 sez = await _casosber_seznam(cfg, url, hodin, d)
             except Exception as ex:
                 log.warning("časosběr %s: %s – použije se snímek", cid, ex)
                 hodin = 0
         zakl = {} if snimek else {"Referer": "https://webtvfc.feratel.com/"}
-        if not hodin:
+        if not chmi or not hodin:
             async with hls.client(cfg).stream("GET", url, headers=hls.req_headers(cfg, dict(zakl, **(headers or {})))) as r:
                 r.raise_for_status()
                 with open(klip, "wb") as f:
                     async for ch in r.aiter_bytes(262144):
                         f.write(ch)
+        if hodin and not chmi:                  # sebrané snímky (CASOSBER_SBER_V1)
+            try:
+                sber_uloz(cid, open(klip, "rb").read(), hodin)
+                sez = _sber_seznam(cid, d)
+            except Exception as ex:
+                log.info("časosběr %s: %s – použije se snímek", cid, ex)
+                hodin = 0
         if hodin:      # časosběr: CAS_FPS snímků/s, poslední drží CAS_DRZET s; klíčový snímek po 2 s
             vstup = ["-f", "concat", "-safe", "0", "-i", sez,
                      "-vf", "scale='min(1920,iw)':-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
@@ -156,7 +256,7 @@ async def priprav(cfg, cid, url, headers=None, snimek=False):
         if not segs:
             raise RuntimeError("smyčka: z klipu nevznikly segmenty " + err.decode(errors="replace")[-200:])
         st = {"ver": ver, "segs": segs, "t": time.time(), "avg": sum(s[1] for s in segs) / len(segs),
-              "max": max(s[1] for s in segs)}
+              "max": max(s[1] for s in segs), "obnova": OBNOVA if hodin else OBNOVA_SNIMEK if snimek else OBNOVA}
         _stav[cid] = st
         # starší verze pryč (poslední 2 zůstávají – přehrávač může dohrávat předchozí)
         verze = sorted(os.listdir(os.path.join(KOREN, cid)))

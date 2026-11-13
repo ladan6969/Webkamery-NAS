@@ -7,6 +7,9 @@ Pak běží každý den ve 2:30 (před kontrolou ve 2:45), výpis je v logs/dopl
 Tento skript stahuje jen seznam kamer (data); kód aktualizuje tools/aktualizuj_kod.py.
 Kamera se přidá jen jednou: kameru, kterou smažeš, automatika nevrátí (kamery_nabidnute.json). Vlastní kamery a úpravy zůstanou.
 Jiná složka instalace: argument /cesta.
+KAMERY_ZMENY_V1 (13. 11. 2026): tools/kamery_zmeny.json na GitHubu = hromadné změny ze správy (smazané duplicity, překlad
+názvů z azbuky). Každá změna se použije jen jednou (kamery_zmeny_hotove.json); přejmenuje se jen kamera, jejíž název
+je pořád původní (vlastní úpravy zůstanou).
 """
 import json
 import os
@@ -20,6 +23,7 @@ import httpx
 
 ZDROJ = "https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/kamery_pridat.json"
 TYPY = ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "ipcamlive", "mjpeg", "regex", "snimek")
+ZDROJ_ZMENY = "https://raw.githubusercontent.com/ladan6969/Webkamery-NAS/main/tools/kamery_zmeny.json"
 ZNACKA = "doplnit_kamery.py"
 
 
@@ -37,6 +41,41 @@ def zapis(soubor, data):
     os.replace(docasny, soubor)
 
 
+def nacti_zmeny():
+    try:
+        r = httpx.get(ZDROJ_ZMENY, timeout=60, follow_redirects=True)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        z = r.json()
+    except (httpx.HTTPError, ValueError) as ex:
+        print("%s změny z GitHubu nejdou načíst (%s), přeskakuji." % (time.strftime("%F %T"), ex))
+        return None
+    if not isinstance(z, dict) or not isinstance(z.get("smazat", []), list) or not isinstance(z.get("prejmenovat", {}), dict):
+        print("%s změny z GitHubu nemají očekávaný tvar, přeskakuji." % time.strftime("%F %T"))
+        return None
+    return z
+
+
+def pouzij_zmeny(kamery, zmeny, hotove):
+    """vrátí (nový seznam, počet smazaných, počet přejmenovaných, nové klíče hotových změn)"""
+    smazat = {i for i in zmeny.get("smazat", []) if isinstance(i, str) and "smazat:" + i not in hotove}
+    pre = {i: v for i, v in zmeny.get("prejmenovat", {}).items()
+           if isinstance(v, dict) and v.get("z") and v.get("na") and "prejmenovat:%s:%s" % (i, v["na"]) not in hotove}
+    vysl, sm, pr = [], 0, 0
+    for c in kamery:
+        if c.get("id") in smazat:
+            sm += 1
+            continue
+        v = pre.get(c.get("id"))
+        if v and c.get("name") == v["z"]:
+            c = dict(c, name=v["na"])
+            pr += 1
+        vysl.append(c)
+    nove = {"smazat:" + i for i in smazat} | {"prejmenovat:%s:%s" % (i, v["na"]) for i, v in pre.items()}
+    return vysl, sm, pr, nove
+
+
 def doplnit(slozka):
     r = httpx.get(ZDROJ, timeout=60, follow_redirects=True)
     r.raise_for_status()
@@ -51,14 +90,27 @@ def doplnit(slozka):
     ids = {c.get("id") for c in kamery}
     nove = [c for c in seznam if c["id"] not in ids and c["id"] not in nabidnute]
 
-    if nove:
+    soubor_hotove = os.path.join(slozka, "kamery_zmeny_hotove.json")
+    hotove = set(json.load(open(soubor_hotove, encoding="utf-8"))) if os.path.exists(soubor_hotove) else set()
+    zmeny = nacti_zmeny()
+    sm = pr = 0
+    nove_hotove = set()
+    if zmeny:
+        upravene, sm, pr, nove_hotove = pouzij_zmeny(kamery, zmeny, hotove)
+        if sm or pr:
+            kamery = upravene
+
+    if nove or sm or pr:
         zaloha = "%s.pred-doplnenim-%s" % (soubor, time.strftime("%Y%m%d_%H%M%S"))
         shutil.copy2(soubor, zaloha)
         zapis(soubor, kamery + nove)
-        print("%s přidáno %d kamer, celkem %d. Záloha: %s" % (time.strftime("%F %T"), len(nove), len(kamery) + len(nove), zaloha))
+        print("%s přidáno %d, smazáno %d, přejmenováno %d kamer, celkem %d. Záloha: %s"
+              % (time.strftime("%F %T"), len(nove), sm, pr, len(kamery) + len(nove), zaloha))
     else:
         print("%s nic k doplnění, kamer je %d." % (time.strftime("%F %T"), len(kamery)))
     zapis(stav, sorted(nabidnute | {c["id"] for c in seznam}))
+    if nove_hotove:
+        zapis(soubor_hotove, sorted(hotove | nove_hotove))
 
 
 def instalovat(slozka):

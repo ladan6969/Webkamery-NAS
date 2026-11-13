@@ -202,10 +202,64 @@ async def _prednacti_oblibene():
         await asyncio.sleep(600)
 
 
+SBER_MAX = 200                  # nejvýš tolik kamer se sbírá (CASOSBER_SBER_V1)
+
+
+def _sber_kamery():
+    """snímkové kamery bez archivu ČHMÚ, které jsou oblíbené nebo se sledovaly za posledních 7 dní"""
+    sled = smycka.sledovane()
+    out = []
+    for c in store.cams():
+        if c.get("type") != "snimek" or not c.get("enabled", True) or smycka.je_chmi(c.get("source") or ""):
+            continue
+        if c.get("oblibena") or c["id"] in sled:
+            out.append((0 if c.get("oblibena") else 1, -sled.get(c["id"], 0), c))
+    return [x[2] for x in sorted(out, key=lambda x: x[:2])][:SBER_MAX]
+
+
+async def _sber_casosberu():
+    """po 10 min stáhne aktuální snímek vybraných kamer, z nich se pak skládá časosběr (smycka.priprav)"""
+    await asyncio.sleep(60)
+    while True:
+        zacatek = time.time()
+        ulozeno = 0
+        try:
+            kamery = _sber_kamery()
+            sem = asyncio.Semaphore(4)
+
+            async def jedna(c):
+                nonlocal ulozeno
+                hodin = smycka.casosber_hodin(CFG, c["id"], c.get("source") or "")
+                if not hodin:
+                    return
+                async with sem:
+                    if CFG.get("vlastni_nas") and checker._nas_vytizeny():
+                        return
+                    try:
+                        e = await aktualni(c)
+                        if e["kind"] != "snimek":
+                            return
+                        r = await hls.client(CFG).get(e["url"], headers=hls.req_headers(CFG, c.get("headers") or {}))
+                        if r.status_code == 200 and r.headers.get("content-type", "image/").startswith("image/"):
+                            if smycka.sber_uloz(c["id"], r.content, hodin):
+                                ulozeno += 1
+                    except Exception as ex:
+                        log.info("časosběr sběr %s: %s", c["id"], ex.__class__.__name__)
+            await asyncio.gather(*(jedna(c) for c in kamery))
+            if kamery:
+                log.info("časosběr: sebráno %d snímků z %d kamer (%.0f s)", ulozeno, len(kamery), time.time() - zacatek)
+        except Exception as ex:
+            log.warning("časosběr sběr: %s", ex)
+        await asyncio.sleep(max(60, smycka.SBER_KROK - (time.time() - zacatek)))
+
+
 @app.on_event("startup")
 async def _start_prednacitani():
+    smycka.SBER = store.path("casosber")
     if CFG.get("vlastni_nas"):
         asyncio.create_task(_prednacti_oblibene())
+    if (CFG.get("casosber") or {}).get("zapnuto"):
+        asyncio.create_task(_sber_casosberu())
 
 
 @app.api_route("/cam/{cid}", methods=["GET", "HEAD"])
@@ -423,7 +477,7 @@ async def api_cams(request: Request):
     for c in cams:
         c["_kat"] = zeme.skupina(c, CFG, None, None, velke)
         c["_tema"] = zeme.tema(c)
-    ids = {c["id"] for c in cams}
+    ids = {c["id"] for c in cams if c.get("enabled", True)}     # vypnutá kamera se v upozornění na přepnutí neukazuje
     return {"cams": cams, "state": s["cams"], "cache": cache.snapshot(), "last_check": s["last_check"],
             "zmeny": {k: v for k, v in resolver.zmeny.items() if k in ids},
             "duplicity": store.duplicity(cams),       # DUPLICITY_V1: stejný stream i výběr u víc kamer
@@ -510,6 +564,21 @@ async def api_prepnout(cid: str, request: Request):
         if x["id"] == cid:
             x["enabled"] = not x["enabled"]
     store.save_cams(lst)
+    return {"ok": True}
+
+
+@app.post("/admin/api/zmeny/skryt")
+async def api_zmeny_skryt(request: Request):
+    """upozornění „samo se přepnulo“: {id} skryje jednu kameru, bez id všechny (do dalšího přepnutí)"""
+    need_admin(request)
+    try:
+        d = await request.json()
+    except Exception:
+        d = {}
+    if d.get("id"):
+        resolver.zmeny.pop(d["id"], None)
+    else:
+        resolver.zmeny.clear()
     return {"ok": True}
 
 

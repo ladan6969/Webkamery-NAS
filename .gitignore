@@ -18,3 +18,5 @@ nas/*.run
 nasadit-card1.sh
 # hotový zip doplňku Kodi (sestavuje se ze složky kodi/script.webcams.upravy)
 kodi/*.zip
+# sebrané snímky pro časosběr
+casosber/
