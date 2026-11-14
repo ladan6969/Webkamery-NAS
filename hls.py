@@ -11,6 +11,8 @@ from urllib.parse import quote, urljoin
 
 import httpx
 
+import store
+
 _client = None
 URI_ATTR = re.compile(r'URI="([^"]+)"')
 
@@ -121,7 +123,7 @@ def _sig(cfg, cid, target):
 
 def proxy_url(cfg, cid, target, key):
     b = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
-    return "%s/proxy/%s?u=%s&s=%s&k=%s" % (cfg["public_base"], quote(cid), b, _sig(cfg, cid, target), quote(key))
+    return "%s/proxy/%s?u=%s&s=%s&k=%s" % (store.base(cfg), quote(cid), b, _sig(cfg, cid, target), quote(key))
 
 
 def proxy_target(cfg, cid, u, s):
@@ -277,7 +279,7 @@ def oriz_media(text, base, segmentu=6):
 
 def oriz_url(cfg, cid, target, key):
     b = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
-    return "%s/oriz/%s?u=%s&s=%s&k=%s" % (cfg["public_base"], quote(cid), b, _sig(cfg, cid, target), quote(key))
+    return "%s/oriz/%s?u=%s&s=%s&k=%s" % (store.base(cfg), quote(cid), b, _sig(cfg, cid, target), quote(key))
 
 
 def presmeruj_okno(cfg, cid, text, key):

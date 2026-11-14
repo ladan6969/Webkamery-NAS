@@ -31,7 +31,7 @@ def _viditelne(cfg, podle=None, cz=None, oblibene=False):
 
 
 def cam_url(cfg, cid, client, key):
-    return "%s/cam/%s?client=%s&k=%s" % (cfg["public_base"], quote(cid), client, quote(key))
+    return "%s/cam/%s?client=%s&k=%s" % (store.base(cfg), quote(cid), client, quote(key))
 
 
 def mode_for(cam, client, st=None):
@@ -49,7 +49,7 @@ def mode_for(cam, client, st=None):
 
 def m3u(cfg, client, key, podle=None, cz=None):
     cams, s = _viditelne(cfg, podle, cz, oblibene=True)
-    b = cfg["public_base"]
+    b = store.base(cfg)
     out = ['#EXTM3U url-tvg="%s/epg.xml?k=%s"' % (b, quote(key))]
     for c in cams:
         out.append('#EXTINF:-1 tvg-id="%s" tvg-name="%s" tvg-logo="%s/thumb/%s.jpg?k=%s" group-title="%s",%s' % (

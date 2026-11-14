@@ -7,10 +7,42 @@ import re
 import json
 import os
 import tempfile
+import contextvars
+import ipaddress
 import threading
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 _lock = threading.RLock()
+
+# TAILSCALE_BASE_V1: požadavek přišel na adresu Tailscale (100.64.0.0/10 nebo *.ts.net) → odkazy v playlistu,
+# bouquetu i proxy skládat z té adresy, ne z public_base (domácí 192.168.x.x je přes Tailscale nedosažitelná)
+_base_pozadavku = contextvars.ContextVar("base_pozadavku", default=None)
+_TS_SITE = (ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("fd7a:115c:a1e0::/48"))
+
+
+def base_z_hostu(host):
+    """Host hlavička → základní adresa, jen když jde o Tailscale; jinak None (platí public_base)."""
+    host = (host or "").strip().lower()
+    m = re.fullmatch(r"\[?([0-9a-z.:-]+?)\]?(?::(\d{1,5}))?", host)
+    if not m:
+        return None
+    jmeno = m.group(1)
+    if jmeno.endswith(".ts.net"):
+        return "http://" + host
+    try:
+        if any(ipaddress.ip_address(jmeno) in s for s in _TS_SITE):
+            return "http://" + host
+    except ValueError:
+        pass
+    return None
+
+
+def nastav_base(b):
+    return _base_pozadavku.set(b)
+
+
+def base(cfg):
+    return _base_pozadavku.get() or cfg["public_base"]
 
 CONFIG_DEFAULT = {
     "bind": "127.0.0.1",

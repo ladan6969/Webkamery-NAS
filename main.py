@@ -54,7 +54,11 @@ app = FastAPI(title="Webcams proxy", docs_url=None, redoc_url=None, openapi_url=
 async def cors_pro_prehravac(request: Request, call_next):
     """přehrávač v administraci (hls.js) stahuje /cam, /proxy a /smycka – i když je administrace otevřená přes jinou adresu
     než public_base (NAS přes Tailscale). Bez klíče ?k= tyto adresy stejně nic nevydají."""
-    r = await call_next(request)
+    tok = store.nastav_base(store.base_z_hostu(request.headers.get("host")))
+    try:
+        r = await call_next(request)
+    finally:
+        store._base_pozadavku.reset(tok)
     if request.url.path.startswith(("/cam/", "/proxy/", "/smycka/")):
         r.headers["Access-Control-Allow-Origin"] = "*"
     return r
@@ -465,7 +469,7 @@ async def api_cams(request: Request):
     need_admin(request)
     s = store.state()
     k = (CFG["access_keys"] or [""])[0]
-    b = CFG["public_base"]
+    b = store.base(CFG)
     cams = store.cams()
     # kategorie jako v playlistu (velké země děleny podle zaměření) + zaměření – pro filtry v administraci
     pocty = {}

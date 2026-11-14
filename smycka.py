@@ -23,6 +23,7 @@ import shutil
 import time
 
 import hls
+import store
 
 log = logging.getLogger("webcams")
 
@@ -276,7 +277,7 @@ def playlist(cfg, cid, st, key, okno=5):
         if i == 0 and j != od:
             out.append("#EXT-X-DISCONTINUITY")
         out.append("#EXTINF:%.3f," % segs[i][1])
-        out.append("%s/smycka/%s/%s/%s?k=%s" % (cfg["public_base"], cid, st["ver"], segs[i][0], key))
+        out.append("%s/smycka/%s/%s/%s?k=%s" % (store.base(cfg), cid, st["ver"], segs[i][0], key))
     return "\n".join(out) + "\n"
 
 
