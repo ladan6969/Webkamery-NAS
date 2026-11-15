@@ -6,9 +6,12 @@ Proxy odkazy nesou cílovou URL (base64) a HMAC podpis – proxy tak stáhne jen
 import base64
 import hashlib
 import hmac
+import os
 import re
+import ssl
 from urllib.parse import quote, urljoin
 
+import certifi
 import httpx
 
 import store
@@ -20,7 +23,13 @@ URI_ATTR = re.compile(r'URI="([^"]+)"')
 def client(cfg):
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(follow_redirects=True, timeout=cfg["http_timeout"],
+        # CERT_DOPLNENE_V1 (15. 11. 2026): některé servery (kamery.wolfnet.cz) neposílají mezilehlý certifikát –
+        # prohlížeč si ho dohledá, Python ne → certs/doplnene.pem se přidá ke standardním kořenovým
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        dopl = os.path.join(os.path.dirname(os.path.abspath(__file__)), "certs", "doplnene.pem")
+        if os.path.exists(dopl):
+            ctx.load_verify_locations(dopl)
+        _client = httpx.AsyncClient(follow_redirects=True, timeout=cfg["http_timeout"], verify=ctx,
                                     limits=httpx.Limits(max_connections=100, max_keepalive_connections=20))
     return _client
 

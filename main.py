@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
@@ -266,10 +266,127 @@ async def _start_prednacitani():
         asyncio.create_task(_sber_casosberu())
 
 
+FF_BEZI = {"n": 0}
+
+
+async def _ts_pres_ffmpeg(request, cam, cid, key):
+    """KODI_FFMPEG_V1 (15. 11. 2026): kamera jako jeden MPEG-TS proud – ffmpeg si sám stáhne HLS (přes /cam pro Kodi:
+    jen nejvyšší kvalita, YouTube od živého konce) a bez překódování ho přebalí. Kodi pak nepotřebuje InputStream Adaptive."""
+    if request.method == "HEAD":
+        return Response(b"", media_type="video/mp2t")
+    if FF_BEZI["n"] >= int(CFG.get("kodi_ffmpeg_max", 6)):
+        return PlainTextResponse("Moc souběžných přehrávání přes ffmpeg", 503)
+    src = "http://127.0.0.1:%d/cam/%s?client=kodi&k=%s" % (int(CFG["port"]), quote(cid), quote(key))
+    h = hls.req_headers(CFG, cam.get("headers"))
+    args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-user_agent", h.pop("User-Agent", CFG["user_agent"])]
+    if h:
+        args += ["-headers", "".join("%s: %s\r\n" % kv for kv in h.items())]
+    args += ["-fflags", "+genpts+discardcorrupt", "-i", src, "-map", "0:v:0?", "-map", "0:a:0?",
+             "-c", "copy", "-f", "mpegts", "-mpegts_flags", "+resend_headers", "pipe:1"]
+    p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    FF_BEZI["n"] += 1
+
+    async def konec():
+        FF_BEZI["n"] -= 1
+        if p.returncode is None:
+            try:
+                p.kill()
+            except ProcessLookupError:
+                pass
+        await p.wait()
+
+    try:
+        first = await asyncio.wait_for(p.stdout.read(65536), timeout=int(CFG.get("resolve_timeout", 30)) + 15)
+    except asyncio.TimeoutError:
+        first = b""
+    if not first:
+        await konec()
+        log.warning("cam %s: ffmpeg nic nevrátil", cid)
+        return PlainTextResponse("Kamera %s teď nejde načíst (ffmpeg)" % cam["name"], 503)
+    log.info("cam %s: ffmpeg TS pro Kodi", cid)
+
+    async def proud():
+        try:
+            yield first
+            while True:
+                b = await p.stdout.read(65536)
+                if not b:
+                    break
+                yield b
+        finally:
+            await konec()
+    return StreamingResponse(proud(), media_type="video/mp2t", headers={"Cache-Control": "no-store"})
+
+
+async def _smycka_ts(request, cam, cid, e):
+    """KODI_SMYCKA_V1 (15. 11. 2026): feratel klip / snímek / časosběr pro Kodi jako nekonečný MPEG-TS.
+    HLS smyčku Kodi po skoku na začátek klipu zastaví (VLC ji hraje dokola) – tady ffmpeg přehraje klip v reálném čase,
+    pak znovu, s navazujícím časem (-output_ts_offset); před každým kolem se vezme čerstvější klip (smycka.priprav)."""
+    if request.method == "HEAD":
+        return Response(b"", media_type="video/mp2t")
+    if FF_BEZI["n"] >= int(CFG.get("kodi_ffmpeg_max", 6)):
+        return PlainTextResponse("Moc souběžných přehrávání přes ffmpeg", 503)
+
+    async def priprav(e):
+        return await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek")
+    try:
+        st = await priprav(e)
+    except Exception as ex:
+        log.warning("smyčka %s: %s", cid, ex)
+        return PlainTextResponse("Kamera %s: klip nejde připravit (%s)" % (cam["name"], ex), 503)
+    FF_BEZI["n"] += 1
+    log.info("cam %s: smyčka TS pro Kodi", cid)
+
+    async def proud():
+        nonlocal st
+        posun, kol = 0.0, 0
+        try:
+            while True:
+                idx = os.path.join(smycka.KOREN, cid, st["ver"], "index.m3u8")
+                p = await asyncio.create_subprocess_exec(
+                    "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-re", "-i", idx,
+                    "-map", "0:v:0?", "-map", "0:a:0?", "-c", "copy", "-output_ts_offset", "%.3f" % posun,
+                    "-f", "mpegts", "-mpegts_flags", "+resend_headers", "pipe:1",
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+                poslano = 0
+                try:
+                    while True:
+                        b = await p.stdout.read(65536)
+                        if not b:
+                            break
+                        poslano += len(b)
+                        yield b
+                finally:
+                    if p.returncode is None:
+                        try:
+                            p.kill()
+                        except ProcessLookupError:
+                            pass
+                    await p.wait()
+                kol = kol + 1 if not poslano else 0
+                if kol >= 3:                        # klip se opakovaně nedá přehrát
+                    log.warning("smyčka %s: ffmpeg nic nevrátil", cid)
+                    return
+                posun += sum(s[1] for s in st["segs"])
+                try:
+                    st = await priprav(await aktualni(cam))
+                except Exception as ex:             # zdroj teď nejde – hraje dál poslední klip
+                    log.info("smyčka %s: obnova klipu %s", cid, ex)
+                    if not os.path.exists(idx):
+                        return
+        finally:
+            FF_BEZI["n"] -= 1
+    return StreamingResponse(proud(), media_type="video/mp2t", headers={"Cache-Control": "no-store"})
+
+
 @app.api_route("/cam/{cid}", methods=["GET", "HEAD"])
-async def cam_stream(cid: str, request: Request, client: str = "kodi"):
+async def cam_stream(cid: str, request: Request, client: str = "kodi", ff: str = ""):
     key = need_key(request)
     cam = najdi(cid)
+    stc = store.state()["cams"].get(cid) or {}
+    smy = (stc.get("type_used") or resolver.typ_odhad(cam)) in ("feratel", "snimek")
+    if ff == "1" and client == "kodi" and not smy and playlist.kodi_ff(CFG, cam, stc):
+        return await _ts_pres_ffmpeg(request, cam, cid, key)
     try:
         e = await aktualni(cam)
     except resolver.ResolveError as ex:
@@ -277,6 +394,8 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi"):
         return PlainTextResponse("Kamera %s teď nejde načíst: %s" % (cam["name"], ex), 503)
     if e["kind"] == "mjpeg":                    # MJPEG: přehrávač si ho otevře sám
         return RedirectResponse(e["url"], 302)
+    if e["kind"] in ("feratel", "snimek") and ff == "1" and client == "kodi" and CFG.get("kodi_ffmpeg"):
+        return await _smycka_ts(request, cam, cid, e)
     if e["kind"] in ("feratel", "snimek"):     # poslední klip / obrázek → nekonečná HLS smyčka
         try:
             st = await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek")

@@ -45,6 +45,8 @@ def cil_souboru(jmeno):
         return jmeno
     if re.fullmatch(r"static/[\w-]+\.html", jmeno):
         return jmeno
+    if re.fullmatch(r"certs/[\w-]+\.pem", jmeno):          # CERT_DOPLNENE_V1: chybějící mezilehlé certifikáty
+        return jmeno
     if jmeno.startswith("tools/") and jmeno[6:] in NASTROJE:
         return jmeno
     if jmeno == "nas/requirements-nas.txt":

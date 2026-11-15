@@ -34,6 +34,17 @@ def cam_url(cfg, cid, client, key):
     return "%s/cam/%s?client=%s&k=%s" % (store.base(cfg), quote(cid), client, quote(key))
 
 
+FF_BEZ = ("mjpeg",)      # MJPEG hraje Kodi samo; feratel/snímek jdou přes KODI_SMYCKA_V1 (nekonečný TS)
+
+
+def kodi_ff(cfg, cam, st=None):
+    """KODI_FFMPEG_V1: má se kamera pro Kodi posílat přes ffmpeg jako MPEG-TS (config kodi_ffmpeg)"""
+    if not cfg.get("kodi_ffmpeg"):
+        return False
+    typ = (st or {}).get("type_used") or resolver.typ_odhad(cam)
+    return typ not in FF_BEZ
+
+
 def mode_for(cam, client, st=None):
     """redirect | proxy – Enigma2 s hlavičkami vždy proxy (SREF umí jen #User-Agent=, ne Referer);
     auto + zdroj odmítá přehrávače (kontrola: force_proxy) → proxy"""
@@ -56,7 +67,12 @@ def m3u(cfg, client, key, podle=None, cz=None):
             c["id"], c["name"].replace('"', "'"), b, quote(c["id"]), quote(key), c["kategorie"].replace('"', "'"), c["name"]))
         url = cam_url(cfg, c["id"], client, key)
         mjpeg = resolver.typ_odhad(c) == "mjpeg" or (s["cams"].get(c["id"]) or {}).get("type_used") == "mjpeg"
-        if client == "kodi" and not mjpeg:
+        if client == "kodi" and kodi_ff(cfg, c, s["cams"].get(c["id"])):
+            # KODI_FFMPEG_V1 (15. 11. 2026): InputStream Adaptive na boxu vypíná obraz YouTube kamer
+            # („Codec id 27 require extradata“) → služba pošle hotový MPEG-TS přes ffmpeg, Kodi ho hraje sám
+            out.append("#KODIPROP:mimetype=video/mp2t")
+            url += "&ff=1"
+        elif client == "kodi" and not mjpeg:
             out.append("#KODIPROP:inputstream=inputstream.adaptive")
             out.append("#KODIPROP:inputstream.adaptive.manifest_type=hls")
             if c.get("headers") and mode_for(c, client, s["cams"].get(c["id"])) == "redirect":
