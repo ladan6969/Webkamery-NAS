@@ -122,7 +122,7 @@ def config():
 # ── kamery ──────────────────────────────────────────────────────────────────────
 CAM_DEFAULT = {"name": "", "group": "Ostatní", "country": "", "category": "", "source": "", "type": "auto",
                "headers": {}, "mode": "auto", "enabled": True, "regex": "", "match": "",
-               "page": "", "note": "", "oblibena": False}
+               "page": "", "note": "", "oblibena": False, "zobrazeni": "auto"}
 
 
 def cams():

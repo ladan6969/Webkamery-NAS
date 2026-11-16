@@ -10,6 +10,7 @@ import base64
 import getpass
 import hashlib
 import hmac
+import json
 import logging
 import logging.handlers
 import os
@@ -233,7 +234,7 @@ async def _sber_casosberu():
 
             async def jedna(c):
                 nonlocal ulozeno
-                hodin = smycka.casosber_hodin(CFG, c["id"], c.get("source") or "")
+                hodin = smycka.casosber_hodin(CFG, c["id"], c.get("source") or "", c.get("zobrazeni"))
                 if not hodin:
                     return
                 async with sem:
@@ -241,8 +242,8 @@ async def _sber_casosberu():
                         return
                     try:
                         e = await aktualni(c)
-                        if e["kind"] != "snimek":
-                            return
+                        if e["kind"] != "snimek" or smycka.je_holidayinfo(e["url"]) or smycka.je_chmi(e["url"]):
+                            return                      # holidayinfo a ČHMÚ mají vlastní archiv – nesbírat
                         r = await hls.client(CFG).get(e["url"], headers=hls.req_headers(CFG, c.get("headers") or {}))
                         if r.status_code == 200 and r.headers.get("content-type", "image/").startswith("image/"):
                             if smycka.sber_uloz(c["id"], r.content, hodin):
@@ -328,7 +329,7 @@ async def _smycka_ts(request, cam, cid, e):
         return PlainTextResponse("Moc souběžných přehrávání přes ffmpeg", 503)
 
     async def priprav(e):
-        return await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek")
+        return await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek", rezim=cam.get("zobrazeni"))
     try:
         st = await priprav(e)
     except Exception as ex:
@@ -384,7 +385,7 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi", ff: str =
     key = need_key(request)
     cam = najdi(cid)
     stc = store.state()["cams"].get(cid) or {}
-    smy = (stc.get("type_used") or resolver.typ_odhad(cam)) in ("feratel", "snimek")
+    smy = (stc.get("type_used") or resolver.typ_odhad(cam)) in resolver.KLIP + ("snimek",)
     if ff == "1" and client == "kodi" and not smy and playlist.kodi_ff(CFG, cam, stc):
         return await _ts_pres_ffmpeg(request, cam, cid, key)
     try:
@@ -394,11 +395,11 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi", ff: str =
         return PlainTextResponse("Kamera %s teď nejde načíst: %s" % (cam["name"], ex), 503)
     if e["kind"] == "mjpeg":                    # MJPEG: přehrávač si ho otevře sám
         return RedirectResponse(e["url"], 302)
-    if e["kind"] in ("feratel", "snimek") and ff == "1" and client == "kodi" and CFG.get("kodi_ffmpeg"):
+    if e["kind"] in resolver.KLIP + ("snimek",) and ff == "1" and client == "kodi" and CFG.get("kodi_ffmpeg"):
         return await _smycka_ts(request, cam, cid, e)
-    if e["kind"] in ("feratel", "snimek"):     # poslední klip / obrázek → nekonečná HLS smyčka
+    if e["kind"] in resolver.KLIP + ("snimek",):     # poslední klip / obrázek → nekonečná HLS smyčka
         try:
-            st = await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek")
+            st = await smycka.priprav(CFG, cid, e["url"], cam.get("headers"), snimek=e["kind"] == "snimek", rezim=cam.get("zobrazeni"))
         except Exception as ex:
             log.warning("smyčka %s: %s", cid, ex)
             return PlainTextResponse("Kamera %s: klip nejde připravit (%s)" % (cam["name"], ex), 503)
@@ -620,10 +621,12 @@ def _cista_kamera(d):
         raise HTTPException(400, "id: 2–40 znaků a-z, 0-9, _ a -")
     if not str(c["source"]).startswith(("http://", "https://")):
         raise HTTPException(400, "source musí být http(s) adresa")
-    if c["type"] not in ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "ipcamlive", "mjpeg", "regex", "snimek") or c["mode"] not in ("auto", "redirect", "proxy"):
+    if c["type"] not in ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "holidayinfo", "ipcamlive", "mjpeg", "regex", "snimek") or c["mode"] not in ("auto", "redirect", "proxy"):
         raise HTTPException(400, "neplatný type / mode")
     if not isinstance(c["headers"], dict):
         raise HTTPException(400, "headers musí být objekt")
+    if c.get("zobrazeni") not in smycka.ZOBRAZENI:
+        c["zobrazeni"] = "auto"
     c["enabled"] = bool(c["enabled"])
     c["oblibena"] = bool(c["oblibena"])
     return c
@@ -804,6 +807,67 @@ async def kodi_soubor(name: str):
     if not CFG.get("kodi_doplnek") or not name.endswith(".zip") or not os.path.isfile(p):
         raise HTTPException(404)
     return FileResponse(p, media_type="application/zip")
+
+
+@app.post("/admin/api/rozpoznej")
+async def api_rozpoznej(request: Request):
+    """ROZPOZNEJ_ODKAZ_V1 (15. 11. 2026, uživatel: „v panelu jen vložení odkazu z adresy, ať si to zjistí samo“):
+    z vloženého odkazu návrh vyplnění formuláře {type, name, id, country, category, group, match, source} a u stránky
+    s víc kamerami (holidayinfo) seznam „kamery“ na výběr. Nic neukládá."""
+    need_admin(request)
+    d = await request.json()
+    src = (d.get("source") or "").strip()
+    if not re.match(r"https?://", src):
+        raise HTTPException(400, "Vložte celý odkaz (https://…)")
+    out = {"source": src, "type": "auto"}
+    typ = resolver.typ_odhad({"source": src, "type": "auto", "match": ""})
+    try:
+        if typ == "holidayinfo":
+            m = re.search(r"holidayinfo\.cz/(?:[a-z]{2}/)?camera/([\w-]+)", src)
+            mc = re.search(r"[?&]camid=(\d+)", src) or re.search(r"/camera/[\w-]+/(\d+)", src)     # i /camera/kycerka/3101
+            text, _ = await hls.fetch_text(CFG, "https://holidayinfo.cz/cs/camera/%s%s" % (m.group(1), "?camid=" + mc.group(1) if mc else ""))
+            i = text.find("setupCamDiv(")
+            data, _ = json.JSONDecoder().raw_decode(text[i + len("setupCamDiv("):])
+            cd, loc = data.get("camdata") or {}, data.get("locdata") or {}
+            mesto = loc.get("nazev_menu") or loc.get("nazev") or m.group(1)
+            jmeno = lambda n: n if mesto.lower() in n.lower() else "%s – %s" % (mesto, n)
+            ids = {c["id"] for c in store.cams()}
+            zdroje = {c["source"] for c in store.cams()}
+            # všechny kamery střediska v provozu – s videem i jen s obrázkem (HOLIDAYINFO_SNIMEK_V1); 2080 Kyčerka má video, ale je vypnutá od 2012
+            kamery = []
+            for k, v in ((data.get("loccams") or {}).get("bycamid") or {}).items():
+                if str(v.get("camactive")) != "1":
+                    continue
+                zdr = "https://holidayinfo.cz/cs/camera/%s?camid=%s" % (m.group(1), k)
+                kamery.append({"camid": k, "name": jmeno(v.get("camname") or k), "id": "hi-" + _slug(jmeno(v.get("camname") or k)),
+                               "source": zdr, "video": bool(v.get("_has_video")), "uz_je": zdr in zdroje})
+            camid = str(cd.get("id_kamery") or (mc.group(1) if mc else ""))
+            nazev = cd.get("nazev_cam") or mesto
+            out.update(type="holidayinfo", source="https://holidayinfo.cz/cs/camera/%s?camid=%s" % (m.group(1), camid),
+                       name=jmeno(nazev), country="CZ", category="hory", kamery=kamery, ma_video=bool(data.get("video")))
+        elif typ in ("ytdlp", "ytkanal") and re.search(r"youtu\.?be", src):
+            r = await hls.client(CFG).get("https://www.youtube.com/oembed", params={"url": src, "format": "json"})
+            if r.status_code == 200:
+                out["name"] = re.sub(r"\s*[|–-]\s*(live|živě|livestream|webcam|webkamera)\b.*$", "", r.json().get("title", ""), flags=re.I).strip()
+        if typ != "holidayinfo" and not out.get("name"):     # obecně: název stránky (og:title / <title>), i když YouTube oEmbed název nedal
+            out["type"] = typ if typ in ("feratel", "skyline", "ipcamlive", "mjpeg") else "auto"
+            if not re.search(r"\.(m3u8|mjpg|jpg|jpeg|png|mp4)(\?|$)", src, re.I):
+                text, _ = await hls.fetch_text(CFG, src)
+                mt = re.search(r"<meta[^>]+property=[\"']og:title[\"'][^>]+content=[\"']([^\"']+)", text, re.I) or re.search(r"<title[^>]*>([^<]+)</title>", text, re.I)
+                if mt:
+                    import html as _html
+                    out["name"] = re.split(r"\s+[|–-]\s+", _html.unescape(mt.group(1)).strip())[0][:80]
+            if re.search(r"\.(jpg|jpeg|png)(\?|$)", src, re.I):
+                out["type"] = "snimek"
+    except Exception as ex:
+        out["chyba"] = "%s: %s" % (ex.__class__.__name__, ex)
+    if out.get("name"):
+        zakl = _slug(out["name"]); nid, n = zakl, 2
+        ids = {c["id"] for c in store.cams()}
+        while nid in ids:
+            nid = "%s-%d" % (zakl, n); n += 1
+        out["id"] = nid
+    return out
 
 
 @app.post("/admin/api/test")

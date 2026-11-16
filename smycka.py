@@ -46,9 +46,15 @@ def _zamek(cid):
     return _zamky[cid]
 
 
-def casosber_hodin(cfg, cid, url):
-    """počet hodin časosběru pro tuto snímkovou kameru, nebo 0 (vypnuto)"""
+def casosber_hodin(cfg, cid, url, rezim=None):
+    """počet hodin časosběru pro tuto snímkovou kameru, nebo 0 (vypnuto); rezim = pole kamery „zobrazeni“"""
     c = cfg.get("casosber") or {}
+    if rezim in ("animace", "stojici"):
+        return 0
+    if rezim == "casosber":                     # výslovně zvolený časosběr platí i bez zapnutí v config
+        return HI_HODIN if je_holidayinfo(url) else max(1, min(24, int(c.get("hodin") or 6)))
+    if je_holidayinfo(url):
+        return 0                                # auto: holidayinfo = animace
     if not c.get("zapnuto"):
         return 0
     if c.get("kamery") and cid not in c["kamery"]:
@@ -106,6 +112,71 @@ async def _casosber_seznam(cfg, url, hodin, d):
 
 def je_chmi(url):
     return bool(CHMI_RE.match(url.split("?")[0]))
+
+
+# HOLIDAYINFO_POSUN_V1 (15. 11. 2026, uživatel: „poslední snímek s posunem“ – místo časosběru dne): holidayinfo u kamer bez
+# videa ukazuje poslední snímek (~35 min) a tlačítkem ▶ po něm jezdí → stejně: 30 s 1280×720, výřez jede tam a zpět a 2× se přiblíží a oddálí (uživatel: „ať to vypadá jako video“)
+HI_RE = re.compile(r"^https://holidayinfo\.cz/hol3_data\.php\?type=panoimg_last&camid=(\d+)&dt=(\d{14})$")
+POSUN_S = 30
+POSUN_FPS = 12
+
+
+def je_holidayinfo(url):
+    return bool(HI_RE.match(url))
+
+
+# ZOBRAZENI_V1 (15. 11. 2026, uživatel: „je možnost u takového zdroje volby animace / časosběr?“): u kamery pole
+# „zobrazeni“: auto | animace (poslední snímek s posunem a přiblížením) | casosber | stojici. auto = jako dřív
+# (holidayinfo animace, ostatní podle config „casosber“). Časosběr holidayinfo bere denní galerii (24 h).
+ZOBRAZENI = ("auto", "animace", "casosber", "stojici")
+HI_HODIN = 24
+
+
+async def _hi_seznam(cfg, url, hodin, d):
+    camid, dt = HI_RE.match(url).groups()
+    kl = hls.client(cfg)
+    r = await kl.get("https://holidayinfo.cz/hol3_data.php", params={"type": "panogal_data", "camid": camid, "dt": dt},
+                     headers=hls.req_headers(cfg, {}))
+    r.raise_for_status()
+    casy = sorted({str(x.get("date", "")) + str(x.get("time", "")) for x in r.json() if isinstance(x, dict)} | {dt})
+    casy = [c for c in casy if re.fullmatch(r"\d{14}", c)]
+    cas = lambda c: time.mktime(time.strptime(c, "%Y%m%d%H%M%S"))
+    konec = cas(casy[-1])
+    vyber = [c for c in casy if cas(c) > konec - hodin * 3600]
+    sd = os.path.join(KOREN, "snimky.casosber", "hi-" + camid)
+    os.makedirs(sd, exist_ok=True)
+    jm = lambda c: c + ".jpg"
+    for f in os.listdir(sd):
+        if f not in {jm(c) for c in vyber}:
+            try:
+                os.unlink(os.path.join(sd, f))
+            except OSError:
+                pass
+    sem = asyncio.Semaphore(3)
+    async def stahni(c):
+        cil = os.path.join(sd, jm(c))
+        if os.path.exists(cil):
+            return
+        async with sem:
+            try:
+                rr = await kl.get("https://holidayinfo.cz/hol3_data.php", params={"type": "panoimg_last", "camid": camid, "dt": c},
+                                  headers=hls.req_headers(cfg, {}))
+                if rr.status_code == 200 and rr.headers.get("content-type", "").startswith("image/") and len(rr.content) > 2000:
+                    with open(cil + ".tmp", "wb") as fh:
+                        fh.write(rr.content)
+                    os.replace(cil + ".tmp", cil)
+            except Exception:
+                pass
+    await asyncio.gather(*(stahni(c) for c in vyber))
+    mam = [jm(c) for c in vyber if os.path.exists(os.path.join(sd, jm(c)))]
+    if len(mam) < 3:
+        raise RuntimeError("časosběr holidayinfo: málo snímků (%d)" % len(mam))
+    sez = os.path.join(d, "snimky.txt")
+    with open(sez, "w") as fh:
+        for i, f in enumerate(mam):
+            fh.write("file '%s'\nduration %s\n" % (os.path.join(sd, f), CAS_DRZET if i == len(mam) - 1 else "%.4f" % (1 / CAS_FPS)))
+        fh.write("file '%s'\n" % os.path.join(sd, mam[-1]))
+    return sez
 
 
 def _sber_dir(cid):
@@ -187,17 +258,28 @@ def zaznamenej_sledovani(cid):
     os.replace(p + ".tmp", p)
 
 
-async def priprav(cfg, cid, url, headers=None, snimek=False):
-    hodin = casosber_hodin(cfg, cid, url) if snimek else 0
-    chmi = bool(hodin) and je_chmi(url)
+async def priprav(cfg, cid, url, headers=None, snimek=False, rezim=None):
+    rezim = rezim if rezim in ZOBRAZENI else "auto"
+    hi = snimek and je_holidayinfo(url)
+    hodin = casosber_hodin(cfg, cid, url, rezim) if snimek else 0
+    chmi = bool(hodin) and (je_chmi(url) or hi)       # časosběr z archivu zdroje (ČHMÚ, galerie holidayinfo)
+    animace = snimek and not hodin and (rezim == "animace" or (rezim == "auto" and hi))
+    zdroj = "%s|%s" % (url, rezim)
     if snimek:
         zaznamenej_sledovani(cid)
     st = _stav.get(cid)
+    if st and st.get("src", zdroj).split("|")[-1] != rezim:
+        st = None                               # u kamery se změnilo zobrazení
     if st and time.time() - st["t"] < st.get("obnova", OBNOVA):
         return st
     async with _zamek(cid):
         st = _stav.get(cid)
+        if st and st.get("src", zdroj).split("|")[-1] != rezim:
+            st = None
         if st and time.time() - st["t"] < st.get("obnova", OBNOVA):
+            return st
+        if animace and hi and st and st.get("src") == zdroj:   # holidayinfo: stejný snímek (adresa s časem) → video znovu nevyrábět
+            st["t"] = time.time()
             return st
         ver = str(int(time.time()))
         d = os.path.join(KOREN, cid, ver)
@@ -205,7 +287,7 @@ async def priprav(cfg, cid, url, headers=None, snimek=False):
         klip = os.path.join(d, "klip.mp4")
         if chmi:
             try:
-                sez = await _casosber_seznam(cfg, url, hodin, d)
+                sez = await (_hi_seznam if hi else _casosber_seznam)(cfg, url, hodin, d)
             except Exception as ex:
                 log.warning("časosběr %s: %s – použije se snímek", cid, ex)
                 hodin = 0
@@ -227,6 +309,16 @@ async def priprav(cfg, cid, url, headers=None, snimek=False):
             vstup = ["-f", "concat", "-safe", "0", "-i", sez,
                      "-vf", "scale='min(1920,iw)':-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
                      "-fps_mode", "cfr", "-r", str(CAS_FPS), "-g", str(2 * CAS_FPS), "-an"]
+        elif animace:    # HOLIDAYINFO_POSUN_V1 (i jiné snímkové kamery se zobrazením „animace“): poslední snímek, obraz plynule jezdí zleva doprava a zpět (jako ▶ na holidayinfo)
+            # snímek se zvětší jen jednou (loop opakuje hotové políčko), zoompan: posun tam a zpět + 2× přiblížení a oddálení
+            # (1,15–1,5×) a mírný pohyb nahoru/dolů; všechno s periodou smyčky → plynulé navázání. Vstup 2880 px proti
+            # chvění zoompanu (zaokrouhlování výřezu).
+            n = POSUN_S * POSUN_FPS
+            vstup = ["-i", klip,
+                     "-vf", ("scale=2880:-2:flags=lanczos,crop=2880:1620,loop=loop=%d:size=1:start=0,setpts=N/%d/TB,"
+                             "zoompan=z='1.15+0.35*(0.5-0.5*cos(4*PI*on/%d))':x='(iw-iw/zoom)*(0.5-0.5*cos(2*PI*on/%d))':"
+                             "y='(ih-ih/zoom)*(0.5-0.2*sin(2*PI*on/%d))':d=1:s=1280x720:fps=%d,format=yuv420p") % (n - 1, POSUN_FPS, n, n, n, POSUN_FPS),
+                     "-c:v", "libx264", "-preset", "veryfast", "-r", str(POSUN_FPS), "-g", str(2 * POSUN_FPS), "-an"]
         elif snimek:     # stojící obraz: 20 s, 2 snímky/s, klíčový snímek každé 2 s; rozměry sudé, nejvýš 1920 px na šířku
             vstup = ["-loop", "1", "-framerate", "2", "-i", klip, "-t", "20",
                      "-vf", "scale='min(1920,iw)':-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
@@ -238,7 +330,7 @@ async def priprav(cfg, cid, url, headers=None, snimek=False):
             "-hls_segment_filename", os.path.join(d, "s%03d.ts"), os.path.join(d, "index.m3u8"),
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
         try:
-            _, err = await asyncio.wait_for(p.communicate(), 240 if hodin else 90)
+            _, err = await asyncio.wait_for(p.communicate(), 240 if hodin or animace else 90)
         except asyncio.TimeoutError:
             p.kill()
             raise RuntimeError("smyčka: ffmpeg timeout")
@@ -257,7 +349,7 @@ async def priprav(cfg, cid, url, headers=None, snimek=False):
         if not segs:
             raise RuntimeError("smyčka: z klipu nevznikly segmenty " + err.decode(errors="replace")[-200:])
         st = {"ver": ver, "segs": segs, "t": time.time(), "avg": sum(s[1] for s in segs) / len(segs),
-              "max": max(s[1] for s in segs), "obnova": OBNOVA if hodin else OBNOVA_SNIMEK if snimek else OBNOVA}
+              "max": max(s[1] for s in segs), "obnova": OBNOVA if hodin else OBNOVA_SNIMEK if snimek else OBNOVA, "src": zdroj}
         _stav[cid] = st
         # starší verze pryč (poslední 2 zůstávají – přehrávač může dohrávat předchozí)
         verze = sorted(os.listdir(os.path.join(KOREN, cid)))

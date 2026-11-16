@@ -262,7 +262,8 @@ async def check_all(cfg, only=None):
     """Kontrola všech (nebo jedné) zapnutých kamer. → souhrn"""
     if running["active"]:
         return {"error": "kontrola už běží"}
-    cams = [c for c in store.cams() if (only is None and c["enabled"]) or c["id"] == only]
+    vyber = set(only.split(",")) if only else None      # i víc kamer najednou: „a,b,c“ (přidání celého střediska)
+    cams = [c for c in store.cams() if (only is None and c["enabled"]) or (vyber and c["id"] in vyber)]
     if only is None:
         st = store.state()["cams"]                 # jednou – ne pro každou kameru (7. 11. 2026: 7 000× načtení zablokovalo službu)
         cams = [c for c in cams if not _jen_tydne(st.get(c["id"]), cfg)]

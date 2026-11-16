@@ -119,6 +119,55 @@ async def _feratel(cfg, cam):
     return url
 
 
+HOLIDAYINFO = "https://holidayinfo.cz"
+
+
+async def _holidayinfo(cfg, cam):
+    """HOLIDAYINFO_V1 (15. 11. 2026, uživatel: „krátké streamy z holidayinfo.cz“): holidayinfo.cz dává u části kamer
+    poslední krátký klip (~40 s MP4, 1080p) – jako feratel se z něj dělá smyčka (smycka.py). Adresa kamery
+    https://holidayinfo.cz/cs/camera/<středisko>[?camid=N] (číslo kamery i v poli match); data jsou ve stránce (setupCamDiv)."""
+    src = cam["source"]
+    m = re.search(r"holidayinfo\.cz/(?:[a-z]{2}/)?camera/([\w-]+)", src)
+    if not m:
+        raise ResolveError("holidayinfo: adresa má být https://holidayinfo.cz/cs/camera/<středisko>[?camid=číslo]")
+    camid = (cam.get("match") or "").strip()
+    if not camid.isdigit():
+        # číslo kamery: ?camid=N nebo v cestě /camera/<středisko>/N (odkaz z webu holidayinfo, 15. 11. 2026)
+        mc = re.search(r"[?&]camid=(\d+)", src) or re.search(r"/camera/[\w-]+/(\d+)", src)
+        camid = mc.group(1) if mc else ""
+    stranka = "%s/cs/camera/%s" % (HOLIDAYINFO, m.group(1)) + ("?camid=" + camid if camid else "")
+    text, _ = await hls.fetch_text(cfg, stranka, cam.get("headers"))
+    i = text.find("setupCamDiv(")
+    if i < 0:
+        raise ResolveError("holidayinfo: stránka kamery nemá data (změnil se web?)")
+    try:
+        d, _ = json.JSONDecoder().raw_decode(text[i + len("setupCamDiv("):])
+    except ValueError:
+        raise ResolveError("holidayinfo: data kamery nejdou přečíst")
+    cd, video = d.get("camdata") or {}, d.get("video") or {}
+    if str(cd.get("active", "")).upper() != "CHECKED":
+        raise ResolveError("holidayinfo: kamera %s teď není v provozu" % (cd.get("nazev_cam") or camid))
+    if not video.get("url_mp4"):
+        # HOLIDAYINFO_SNIMEK_V1 (15. 11. 2026, Kyčerka): většina kamer dává jen obrázek (~každých 35 min) →
+        # poslední obrázek (plné rozlišení) a z něj smyčka jako u snímkových kamer; resolve() vrátí typ „snimek“
+        dt = "%s%s" % (cd.get("datum", ""), cd.get("cas", ""))
+        if not re.fullmatch(r"\d{14}", dt):
+            raise ResolveError("holidayinfo: kamera %s nemá video ani čas posledního obrázku" % (cd.get("nazev_cam") or camid))
+        stari = time.time() - time.mktime(time.strptime(dt, "%Y%m%d%H%M%S"))
+        if stari > SNIMEK_MAX_STARI:
+            raise ResolveError("holidayinfo: obrázek kamery %s se neobnovuje (naposledy před %d h)" % (cd.get("nazev_cam") or camid, stari // 3600))
+        img = "%s/hol3_data.php?type=panoimg_last&camid=%s&dt=%s" % (HOLIDAYINFO, cd.get("id_kamery") or camid, dt)
+        async with hls.client(cfg).stream("GET", img, headers=hls.req_headers(cfg, cam.get("headers"))) as r:
+            if r.status_code != 200 or not r.headers.get("content-type", "").startswith("image/"):
+                raise ResolveError("holidayinfo: obrázek kamery není (HTTP %s)" % r.status_code)
+        return img
+    url = "%s/%s&dt=%s%s" % (HOLIDAYINFO, video["url_mp4"].lstrip("/"), cd.get("datum", ""), cd.get("cas", ""))
+    async with hls.client(cfg).stream("GET", url, headers=hls.req_headers(cfg, cam.get("headers"))) as r:
+        if r.status_code != 200 or "video" not in r.headers.get("content-type", ""):
+            raise ResolveError("holidayinfo: klip kamery není (HTTP %s)" % r.status_code)
+    return url
+
+
 SNIMEK_MAX_STARI = 6 * 3600       # starší obrázek = kamera zamrzla (Last-Modified)
 SNIMEK_HODINA = "{hodina_utc}"          # v adrese snímku: aktuální hodina UTC jako 20261108_0900
 
@@ -369,9 +418,10 @@ async def _regex(cfg, cam):
     return m.group(1) if m.groups() else m.group(0)
 
 
-RESOLVERS = {"direct": _direct, "ytdlp": _ytdlp_cam, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel,
+RESOLVERS = {"direct": _direct, "ytdlp": _ytdlp_cam, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel, "holidayinfo": _holidayinfo,
              "ipcamlive": _ipcamlive, "mjpeg": _mjpeg, "regex": _regex, "snimek": _snimek}
-NE_HLS = ("feratel", "mjpeg", "snimek")   # výsledek není HLS playlist (smyčka klipu / MJPEG / smyčka ze snímku)
+KLIP = ("feratel", "holidayinfo")         # poslední klip MP4 → smyčka (smycka.py)
+NE_HLS = KLIP + ("mjpeg", "snimek")   # výsledek není HLS playlist (smyčka klipu / MJPEG / smyčka ze snímku)
 
 
 def typ_odhad(cam):
@@ -388,6 +438,8 @@ def _poradi(cam):
         return ["skyline"]
     if "feratel.com" in src:
         return ["feratel"]
+    if "holidayinfo.cz/" in src and "/camera/" in src:
+        return ["holidayinfo"]
     if "ipcamlive.com" in src:
         return ["ipcamlive"]
     if "mjpg" in src or "mjpeg" in src or "video.cgi" in src:
@@ -405,6 +457,8 @@ async def resolve(cfg, cam):
     for t in _poradi(cam):
         try:
             url = await RESOLVERS[t](cfg, cam)
+            if t == "holidayinfo" and "type=panoimg_last" in url:
+                t = "snimek"                  # kamera holidayinfo jen s obrázkem → smyčka ze snímku
             log.info("resolve %s: %s OK", cam["id"], t)
             return url, t
         except ResolveError as e:
