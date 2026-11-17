@@ -122,7 +122,8 @@ def config():
 # ── kamery ──────────────────────────────────────────────────────────────────────
 CAM_DEFAULT = {"name": "", "group": "Ostatní", "country": "", "category": "", "source": "", "type": "auto",
                "headers": {}, "mode": "auto", "enabled": True, "regex": "", "match": "",
-               "page": "", "note": "", "oblibena": False, "zobrazeni": "auto"}
+               "page": "", "note": "", "oblibena": False, "zobrazeni": "auto",
+               "uhd": False}       # YT_4K_V1: YouTube kamera ve 4K (/cam4k, jen kde je instalace yt4k)
 
 
 def cams():

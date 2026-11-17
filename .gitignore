@@ -14,8 +14,9 @@ thumbs/
 *.log
 # hotový instalační balík (obsahuje data kamer)
 nas/*.run
-# nasazení na card1 (adresa serveru) – neposílat do veřejného repa
-nasadit-card1.sh
+# nasazovací skripty (adresy serverů, uživatel root, cesty) – jen lokálně, do veřejného repa ne (16. 11. 2026)
+nasadit-*.sh
+*.pred-*
 # hotový zip doplňku Kodi (sestavuje se ze složky kodi/script.webcams.upravy)
 kodi/*.zip
 # sebrané snímky pro časosběr

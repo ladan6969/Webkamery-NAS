@@ -64,16 +64,24 @@ async def _ytdlp(cfg, cam):
     for k, v in (cam.get("headers") or {}).items():
         args += ["--add-header", "%s:%s" % (k, v)]
     args.append(cam["source"])
-    async with _YTDLP_ZAMEK:
-        p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        try:
-            out, err = await asyncio.wait_for(p.communicate(), timeout=cfg["resolve_timeout"])
-        except asyncio.TimeoutError:
-            p.kill()
-            await p.wait()
-            raise ResolveError("yt-dlp: timeout %d s" % cfg["resolve_timeout"])
-    if p.returncode != 0:
-        msg = (err.decode(errors="replace").strip().splitlines() or ["?"])[-1]
+
+    async def _spust(a):
+        async with _YTDLP_ZAMEK:
+            p = await asyncio.create_subprocess_exec(*a, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            try:
+                out, err = await asyncio.wait_for(p.communicate(), timeout=cfg["resolve_timeout"])
+            except asyncio.TimeoutError:
+                p.kill()
+                await p.wait()
+                raise ResolveError("yt-dlp: timeout %d s" % cfg["resolve_timeout"])
+        return p.returncode, out, (err.decode(errors="replace").strip().splitlines() or ["?"])[-1]
+
+    rc, out, msg = await _spust(args)
+    # YT_MWEB_V1: majitel zakázal přehrávání mimo YouTube (embed) → výchozí klienti yt-dlp (tv/android_vr) odmítnou,
+    # mobilní web (mweb) přenos načte (16. 11. Panorama zYLsqXPfMqw)
+    if rc != 0 and "other websites has been disabled" in msg and re.search(r"youtu\.?be", cam["source"]):
+        rc, out, msg = await _spust(args[:-1] + ["--extractor-args", "youtube:player_client=mweb", cam["source"]])
+    if rc != 0:
         raise ResolveError("yt-dlp: " + msg[:300])
     d = json.loads(out)
     if d.get("_type") == "playlist" and d.get("entries"):

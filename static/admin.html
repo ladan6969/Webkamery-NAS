@@ -92,6 +92,7 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 <label>Název přenosu (ytkanal: kanál + text z názvu, re:… = regex)<input id="f_match" placeholder="Times Square"></label>
 <label>Mód<select id="f_mode"><option>auto</option><option>redirect</option><option>proxy</option></select></label>
 <label title="Jen pro kamery, které dávají obrázek (holidayinfo bez videa, ČHMÚ, snímky)">Zobrazení snímku<select id="f_zobrazeni"><option value="auto">automaticky</option><option value="animace">animace – posun a přiblížení</option><option value="casosber">časosběr</option><option value="stojici">stojící obraz</option></select></label>
+<label title="YT_4K_V1: YouTube přenos ve 4K (VP9) jako MP4 – Kodi i přehrávač tady. Potřebuje instalaci yt4k (Odroid) a přehrávač s VP9 4K; když 4K nejde, hraje běžně do 1080p.">4K (YouTube)<select id="f_uhd"><option value="">ne – běžně do 1080p</option><option value="1">ano – 4K, když to přenos má</option></select></label>
 <label>Regex (jen typ regex)<input id="f_regex" placeholder="výchozí: …\.m3u8…"></label>
 <label class="siroke">Hlavičky (JSON, např. {"Referer":"https://…"})<textarea id="f_headers" rows="2">{}</textarea></label>
 </div>
@@ -230,7 +231,7 @@ function karta(c) {
     <div class="obr" style="background-image:url('${nahled(c)}')" onclick="prehrat('${id}')" title="Přehrát">
       <span class="tecka ${esc(st)}" title="${esc(stTxt)}"></span>
       <button class="hvezda${c.oblibena ? ' on' : ''}" title="${c.oblibena ? 'Odebrat z oblíbených' : 'Přidat do oblíbených (skupina ⭐ Oblíbené nahoře v playlistu)'}" onclick="event.stopPropagation();oblibena('${id}')">${c.oblibena ? '★' : '☆'}</button>
-      <span class="stitky">${v ? `<span class="st-k">${v}</span>` : ''}<span class="st-k typ-${esc(c.type === 'auto' ? (s.type_used || 'auto') : c.type)}">${esc(typN(c.type === 'auto' ? (s.type_used || 'auto') : c.type))}</span></span></div>
+      <span class="stitky">${c.uhd ? '<span class="st-k" title="4K z YouTube (YT_4K_V1)">4K</span>' : ''}${v ? `<span class="st-k">${v}</span>` : ''}<span class="st-k typ-${esc(c.type === 'auto' ? (s.type_used || 'auto') : c.type)}">${esc(typN(c.type === 'auto' ? (s.type_used || 'auto') : c.type))}</span></span></div>
     <div class="popis"><b>${vlajka(c.country)} ${esc(c.name)}</b>
       <div class="sed">${esc(stTxt)}${s.fail_streak ? ' · neúspěch ' + s.fail_streak + '×' : ''}${D.zmeny && D.zmeny[c.id] ? ' · ↻ samo přepnuto' : ''}${s.last_ok ? ' · OK ' + esc(s.last_ok.slice(5, 16)) : ''}</div>
       ${s.error && st !== 'ok' ? `<div class="sed" title="${esc(s.error)}">${esc(s.error.slice(0, 70))}</div>` : ''}</div>
@@ -320,6 +321,19 @@ async function prehrat(id) {
   }
   box.innerHTML = '<video controls autoplay muted playsinline></video>';
   const v = box.querySelector('video');
+  if (c.uhd) {                 // YT_4K_V1: fragmentované MP4 (VP9 4K); když nejde, běžné HLS
+    stav.textContent = 'Načítám 4K… první spuštění trvá asi 15–30 s.';
+    const hraje4k = () => stav.textContent = `Hraje 4K${v.videoHeight ? ' · ' + v.videoWidth + '×' + v.videoHeight : ''} · zvuk je ztlumený, zapneš ho v přehrávači`;
+    v.addEventListener('playing', hraje4k, {once: true});
+    v.addEventListener('error', () => { stav.textContent = '4K nejde, zkouším běžnou kvalitu…'; prehratHls(c, id, url, box, stav); }, {once: true});
+    v.src = `../cam4k/${encodeURIComponent(id)}?client=web&k=${encodeURIComponent(KL)}`;
+    return;
+  }
+  prehratHls(c, id, url, box, stav);
+}
+async function prehratHls(c, id, url, box, stav) {
+  box.innerHTML = '<video controls autoplay muted playsinline></video>';
+  const v = box.querySelector('video');
   const hraje = () => stav.textContent = `Hraje${v.videoHeight ? ' · ' + v.videoWidth + '×' + v.videoHeight : ''} · zvuk je ztlumený, zapneš ho v přehrávači`;
   let posledni = 0;
   v.addEventListener('playing', hraje);
@@ -336,6 +350,7 @@ async function prehrat(id) {
 }
 function zavritPrehr() {
   if (HLS) { HLS.destroy(); HLS = null; }
+  const v = document.querySelector('#prehrObraz video'); if (v) { v.removeAttribute('src'); v.load(); }   // 4K: ukončit stahování MP4
   document.getElementById('prehrObraz').innerHTML = '';
   document.getElementById('prehr').style.display = 'none';
 }
@@ -345,6 +360,7 @@ const pole = ['source', 'id', 'name', 'group', 'country', 'category', 'type', 'm
 function vyplnit(c) {
   pole.forEach(p => document.getElementById('f_' + p).value = c[p] ?? (p === 'type' || p === 'mode' || p === 'zobrazeni' ? 'auto' : ''));
   document.getElementById('f_headers').value = JSON.stringify(c.headers || {});
+  document.getElementById('f_uhd').value = c.uhd ? '1' : '';
   document.getElementById('vysl').innerHTML = '';
   document.getElementById('formKarta').style.display = '';
   document.getElementById('formKarta').scrollIntoView({behavior: 'smooth'});
@@ -355,6 +371,7 @@ function zavrit() { document.getElementById('formKarta').style.display = 'none';
 function formData() {
   const d = {}; pole.forEach(p => d[p] = document.getElementById('f_' + p).value.trim());
   try { d.headers = JSON.parse(document.getElementById('f_headers').value || '{}'); } catch (e) { throw new Error('Hlavičky nejsou platný JSON'); }
+  d.uhd = document.getElementById('f_uhd').value === '1';
   d.enabled = puvodni ? (D.cams.find(x => x.id === puvodni) || {}).enabled !== false : true;
   return d;
 }

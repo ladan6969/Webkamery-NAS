@@ -32,6 +32,7 @@ import hls
 import playlist
 import resolver
 import smycka
+import yt4k
 import store
 import zeme
 
@@ -60,7 +61,7 @@ async def cors_pro_prehravac(request: Request, call_next):
         r = await call_next(request)
     finally:
         store._base_pozadavku.reset(tok)
-    if request.url.path.startswith(("/cam/", "/proxy/", "/smycka/")):
+    if request.url.path.startswith(("/cam/", "/cam4k/", "/proxy/", "/smycka/")):
         r.headers["Access-Control-Allow-Origin"] = "*"
     return r
 CFG = store.config()
@@ -432,6 +433,38 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi", ff: str =
     return Response(text, media_type=MPEGURL, headers={"Cache-Control": "no-store"})
 
 
+@app.api_route("/cam4k/{cid}", methods=["GET", "HEAD"])
+async def cam4k(cid: str, request: Request, client: str = "kodi"):
+    """YT_4K_V1: kamera z YouTube ve 4K jako fragmentované MP4 (Kodi, přehrávač ve správě). Když 4K nejde
+    (není instalace / přenos 4K nemá / YouTube odmítne), Kodi dostane běžnou cestu (přesměrování na /cam), web 503."""
+    key = need_key(request)
+    cam = najdi(cid)
+
+    def jinak(duvod):
+        log.info("4K %s: běžná cesta (%s)", cid, duvod)
+        if client == "web":
+            return PlainTextResponse("4K teď nejde: " + duvod, 503)
+        ff = "&ff=1" if playlist.kodi_ff(CFG, cam, store.state()["cams"].get(cid)) else ""
+        return RedirectResponse("%s/cam/%s?client=kodi%s&k=%s" % (store.base(CFG), quote(cid), ff, quote(key)), 302)
+
+    if not cam.get("uhd") or not yt4k.dostupne(CFG):
+        return jinak("vypnuto")
+    vid = yt4k.video_id(cam)
+    if not vid:
+        try:
+            vid = yt4k.video_id(cam, (await aktualni(cam))["url"])
+        except Exception as ex:
+            return jinak("adresa: %s" % ex)
+    if not vid:
+        return jinak("není YouTube")
+    if request.method == "HEAD":
+        return Response(media_type="video/mp4", headers={"Cache-Control": "no-store"})
+    p = await yt4k.proud(CFG, cid, vid)
+    if not p:
+        return jinak("stahovač nedal obraz")
+    return StreamingResponse(p.divak(), media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
 @app.api_route("/oriz/{cid}", methods=["GET", "HEAD"])
 async def oriz(cid: str, request: Request, u: str = "", s: str = ""):
     """media playlist s hodinovým záznamem (YouTube) → jen posledních ~30 s; segmenty jdou dál přímo ke zdroji"""
@@ -540,7 +573,8 @@ async def health():
     skryte = sum(1 for c in zap if not checker.visible(s["cams"].get(c["id"]), CFG))
     return {"verze": VERZE, "kod": KOD_VERZE, "kamer": len(cams), "zapnutych": len(zap), "ok": ok, "skrytych_mrtvych": skryte,
             "yt_dlp": await resolver.ytdlp_version(), "posledni_kontrola": s["last_check"],
-            "kontrola_bezi": checker.running["active"], "v_cache": len(cache.snapshot())}
+            "kontrola_bezi": checker.running["active"], "v_cache": len(cache.snapshot()),
+            "yt4k": {"dostupne": yt4k.dostupne(CFG), "proudy": yt4k.stav()}}
 
 
 # ── administrace ────────────────────────────────────────────────────────────────
@@ -629,6 +663,7 @@ def _cista_kamera(d):
         c["zobrazeni"] = "auto"
     c["enabled"] = bool(c["enabled"])
     c["oblibena"] = bool(c["oblibena"])
+    c["uhd"] = bool(c.get("uhd"))
     return c
 
 

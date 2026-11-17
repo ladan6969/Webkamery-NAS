@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 import checker
 import resolver
+import yt4k
 import store
 import zeme
 
@@ -67,7 +68,10 @@ def m3u(cfg, client, key, podle=None, cz=None):
             c["id"], c["name"].replace('"', "'"), b, quote(c["id"]), quote(key), c["kategorie"].replace('"', "'"), c["name"]))
         url = cam_url(cfg, c["id"], client, key)
         mjpeg = resolver.typ_odhad(c) == "mjpeg" or (s["cams"].get(c["id"]) or {}).get("type_used") == "mjpeg"
-        if client == "kodi" and kodi_ff(cfg, c, s["cams"].get(c["id"])):
+        if client == "kodi" and c.get("uhd") and yt4k.dostupne(cfg):
+            # YT_4K_V1 (16. 11. 2026): YouTube ve 4K jako fMP4; když 4K nejde, /cam4k přesměruje na běžnou cestu
+            url = "%s/cam4k/%s?client=kodi&k=%s" % (store.base(cfg), quote(c["id"]), quote(key))
+        elif client == "kodi" and kodi_ff(cfg, c, s["cams"].get(c["id"])):
             # KODI_FFMPEG_V1 (15. 11. 2026): InputStream Adaptive na boxu vypíná obraz YouTube kamer
             # („Codec id 27 require extradata“) → služba pošle hotový MPEG-TS přes ffmpeg, Kodi ho hraje sám
             out.append("#KODIPROP:mimetype=video/mp2t")
