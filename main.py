@@ -31,6 +31,7 @@ import checker
 import hls
 import playlist
 import resolver
+import rtsp
 import smycka
 import yt4k
 import store
@@ -271,20 +272,24 @@ async def _start_prednacitani():
 FF_BEZI = {"n": 0}
 
 
-async def _ts_pres_ffmpeg(request, cam, cid, key):
+async def _ts_pres_ffmpeg(request, cam, cid, key, zdroj=None):
     """KODI_FFMPEG_V1 (15. 11. 2026): kamera jako jeden MPEG-TS proud – ffmpeg si sám stáhne HLS (přes /cam pro Kodi:
     jen nejvyšší kvalita, YouTube od živého konce) a bez překódování ho přebalí. Kodi pak nepotřebuje InputStream Adaptive."""
     if request.method == "HEAD":
         return Response(b"", media_type="video/mp2t")
     if FF_BEZI["n"] >= int(CFG.get("kodi_ffmpeg_max", 6)):
         return PlainTextResponse("Moc souběžných přehrávání přes ffmpeg", 503)
-    src = "http://127.0.0.1:%d/cam/%s?client=kodi&k=%s" % (int(CFG["port"]), quote(cid), quote(key))
-    h = hls.req_headers(CFG, cam.get("headers"))
-    args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-user_agent", h.pop("User-Agent", CFG["user_agent"])]
-    if h:
-        args += ["-headers", "".join("%s: %s\r\n" % kv for kv in h.items())]
-    args += ["-fflags", "+genpts+discardcorrupt", "-i", src, "-map", "0:v:0?", "-map", "0:a:0?",
-             "-c", "copy", "-f", "mpegts", "-mpegts_flags", "+resend_headers", "pipe:1"]
+    if zdroj:      # RTSP_V1: rtsp:// rovnou ffmpegem, obraz beze změny, zvuk IP kamer (G.711…) → AAC
+        args = (["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error"] + rtsp.ffmpeg_vstup(zdroj) +
+                ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "copy"] + rtsp.ZVUK + ["-f", "mpegts", "-mpegts_flags", "+resend_headers", "pipe:1"])
+    else:
+        src = "http://127.0.0.1:%d/cam/%s?client=kodi&k=%s" % (int(CFG["port"]), quote(cid), quote(key))
+        h = hls.req_headers(CFG, cam.get("headers"))
+        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-user_agent", h.pop("User-Agent", CFG["user_agent"])]
+        if h:
+            args += ["-headers", "".join("%s: %s\r\n" % kv for kv in h.items())]
+        args += ["-fflags", "+genpts+discardcorrupt", "-i", src, "-map", "0:v:0?", "-map", "0:a:0?",
+                 "-c", "copy", "-f", "mpegts", "-mpegts_flags", "+resend_headers", "pipe:1"]
     p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
     FF_BEZI["n"] += 1
 
@@ -305,7 +310,7 @@ async def _ts_pres_ffmpeg(request, cam, cid, key):
         await konec()
         log.warning("cam %s: ffmpeg nic nevrátil", cid)
         return PlainTextResponse("Kamera %s teď nejde načíst (ffmpeg)" % cam["name"], 503)
-    log.info("cam %s: ffmpeg TS pro Kodi", cid)
+    log.info("cam %s: ffmpeg TS%s", cid, " z RTSP" if zdroj else " pro Kodi")
 
     async def proud():
         try:
@@ -386,6 +391,17 @@ async def cam_stream(cid: str, request: Request, client: str = "kodi", ff: str =
     key = need_key(request)
     cam = najdi(cid)
     stc = store.state()["cams"].get(cid) or {}
+    if resolver.typ_odhad(cam) == "rtsp":      # RTSP_V1: web → živé HLS (rtsp.py), ostatní → MPEG-TS
+        if client != "web":
+            return await _ts_pres_ffmpeg(request, cam, cid, key, zdroj=cam["source"].strip())
+        if request.method == "HEAD":
+            return Response(b"", media_type=MPEGURL)
+        try:
+            d = await rtsp.spustit(CFG, cid, cam["source"].strip())
+        except Exception as ex:
+            log.warning("rtsp %s: %s", cid, ex)
+            return PlainTextResponse("Kamera %s teď nejde načíst: %s" % (cam["name"], ex), 503)
+        return RedirectResponse("../rtsp/%s/i.m3u8?k=%s" % (quote(cid), quote(key)), 302)
     smy = (stc.get("type_used") or resolver.typ_odhad(cam)) in resolver.KLIP + ("snimek",)
     if ff == "1" and client == "kodi" and not smy and playlist.kodi_ff(CFG, cam, stc):
         return await _ts_pres_ffmpeg(request, cam, cid, key)
@@ -515,6 +531,23 @@ async def proxy(cid: str, request: Request, u: str = "", s: str = ""):
             await r.aclose()
     hl = {k: v for k, v in r.headers.items() if k.lower() in ("content-length", "cache-control")}
     return StreamingResponse(proud(), media_type=ct or "application/octet-stream", headers=hl)
+
+
+@app.api_route("/rtsp/{cid}/{name}", methods=["GET", "HEAD"])
+async def rtsp_hls(cid: str, name: str, request: Request):
+    """RTSP_V1: živé HLS z RTSP pro přehrávač ve správě (playlist a segmenty z dočasné složky)"""
+    key = need_key(request)
+    cam = najdi(cid)
+    if name == "i.m3u8":
+        try:
+            d = await rtsp.spustit(CFG, cid, cam["source"].strip())
+        except Exception as ex:
+            return PlainTextResponse("Kamera %s teď nejde načíst: %s" % (cam["name"], ex), 503)
+        return Response(rtsp.playlist(cid, d, key), media_type=MPEGURL, headers={"Cache-Control": "no-store"})
+    p = rtsp.segment(cid, name)
+    if not p:
+        raise HTTPException(404, "Segment není")
+    return FileResponse(p, media_type="video/mp2t", headers={"Cache-Control": "no-store"})
 
 
 @app.api_route("/smycka/{cid}/{ver}/{name}", methods=["GET", "HEAD"])
@@ -653,9 +686,11 @@ def _cista_kamera(d):
     c["id"] = (d.get("id") or "").strip().lower()
     if not re.fullmatch(r"[a-z0-9_-]{2,40}", c["id"]):
         raise HTTPException(400, "id: 2–40 znaků a-z, 0-9, _ a -")
-    if not str(c["source"]).startswith(("http://", "https://")):
-        raise HTTPException(400, "source musí být http(s) adresa")
-    if c["type"] not in ("auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "holidayinfo", "ipcamlive", "mjpeg", "regex", "snimek") or c["mode"] not in ("auto", "redirect", "proxy"):
+    if not str(c["source"]).startswith(("http://", "https://", "rtsp://", "rtsps://")):
+        raise HTTPException(400, "source musí být http(s) nebo rtsp:// adresa")
+    if str(c["source"]).startswith(("rtsp://", "rtsps://")):     # RTSP_V1: typ i režim podle adresy
+        c["type"], c["mode"], c["uhd"] = "rtsp", "auto", False
+    if c["type"] not in ("rtsp", "auto", "direct", "ytdlp", "ytkanal", "skyline", "feratel", "holidayinfo", "ipcamlive", "mjpeg", "regex", "snimek") or c["mode"] not in ("auto", "redirect", "proxy"):
         raise HTTPException(400, "neplatný type / mode")
     if not isinstance(c["headers"], dict):
         raise HTTPException(400, "headers musí být objekt")
@@ -852,9 +887,18 @@ async def api_rozpoznej(request: Request):
     need_admin(request)
     d = await request.json()
     src = (d.get("source") or "").strip()
-    if not re.match(r"https?://", src):
-        raise HTTPException(400, "Vložte celý odkaz (https://…)")
+    if not re.match(r"(https?|rtsps?)://", src):
+        raise HTTPException(400, "Vložte celý odkaz (https://… nebo rtsp://…)")
     out = {"source": src, "type": "auto"}
+    if src.lower().startswith(("rtsp://", "rtsps://")):        # RTSP_V1: název z adresy, ověří se tlačítkem Test
+        m = re.match(r"rtsps?://(?:[^@/]*@)?([^/:?]+)", src, re.I)
+        out.update(type="rtsp", name=(m.group(1) if m else "RTSP kamera")[:80])
+        zakl = _slug(out["name"]); nid, n = zakl, 2
+        ids = {c["id"] for c in store.cams()}
+        while nid in ids:
+            nid = "%s-%d" % (zakl, n); n += 1
+        out["id"] = nid
+        return out
     typ = resolver.typ_odhad({"source": src, "type": "auto", "match": ""})
     try:
         if typ == "holidayinfo":

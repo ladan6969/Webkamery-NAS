@@ -49,6 +49,13 @@ def _ff_headers(cfg, headers):
     return args
 
 
+def _vstup(cfg, url, headers):
+    """RTSP_V1: rtsp:// přes TCP s časovým limitem; jinak HTTP volby (rw_timeout, User-Agent, hlavičky)"""
+    if url.lower().startswith(("rtsp://", "rtsps://")):
+        return ["-rtsp_transport", "tcp", "-timeout", "15000000"]
+    return ["-rw_timeout", "15000000"] + _ff_headers(cfg, headers)
+
+
 async def _run(args, timeout):
     p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     try:
@@ -60,7 +67,7 @@ async def _run(args, timeout):
 
 
 async def ffprobe(cfg, url, headers):
-    out, err = await _run(["ffprobe", "-v", "error", "-rw_timeout", "15000000"] + _ff_headers(cfg, headers) +
+    out, err = await _run(["ffprobe", "-v", "error"] + _vstup(cfg, url, headers) +
                           ["-show_entries", "stream=codec_type,codec_name,width,height,avg_frame_rate", "-of", "json", url], 40)
     if not out:
         return None
@@ -78,7 +85,7 @@ async def ffprobe(cfg, url, headers):
 
 async def thumbnail(cfg, url, headers, dest):
     tmp = dest + ".tmp.jpg"
-    out, err = await _run(["ffmpeg", "-y", "-v", "error", "-rw_timeout", "15000000"] + _ff_headers(cfg, headers) +
+    out, err = await _run(["ffmpeg", "-y", "-v", "error"] + _vstup(cfg, url, headers) +
                           ["-i", url, "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "4", tmp], 45)
     if out is not None and os.path.exists(tmp) and os.path.getsize(tmp) > 1000:
         os.replace(tmp, dest)

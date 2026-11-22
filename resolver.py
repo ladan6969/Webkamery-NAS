@@ -426,10 +426,18 @@ async def _regex(cfg, cam):
     return m.group(1) if m.groups() else m.group(0)
 
 
-RESOLVERS = {"direct": _direct, "ytdlp": _ytdlp_cam, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel, "holidayinfo": _holidayinfo,
+async def _rtsp(cfg, cam):
+    """RTSP_V1 (21. 11. 2026): veřejná kamera rtsp:// – adresa je rovnou zdroj, přehrává se přes ffmpeg (main.py, rtsp.py)"""
+    src = (cam.get("source") or "").strip()
+    if not src.lower().startswith(("rtsp://", "rtsps://")):
+        raise ResolveError("rtsp: adresa musí začínat rtsp://")
+    return src
+
+
+RESOLVERS = {"rtsp": _rtsp, "direct": _direct, "ytdlp": _ytdlp_cam, "ytkanal": _ytkanal, "skyline": _skyline, "feratel": _feratel, "holidayinfo": _holidayinfo,
              "ipcamlive": _ipcamlive, "mjpeg": _mjpeg, "regex": _regex, "snimek": _snimek}
 KLIP = ("feratel", "holidayinfo")         # poslední klip MP4 → smyčka (smycka.py)
-NE_HLS = KLIP + ("mjpeg", "snimek")   # výsledek není HLS playlist (smyčka klipu / MJPEG / smyčka ze snímku)
+NE_HLS = KLIP + ("mjpeg", "snimek", "rtsp")   # výsledek není HLS playlist (smyčka klipu / MJPEG / smyčka ze snímku)
 
 
 def typ_odhad(cam):
@@ -442,6 +450,8 @@ def _poradi(cam):
     if t != "auto":
         return [t]
     src = cam["source"].lower()
+    if src.startswith(("rtsp://", "rtsps://")):        # RTSP_V1
+        return ["rtsp"]
     if "skylinewebcams.com" in src:
         return ["skyline"]
     if "feratel.com" in src:

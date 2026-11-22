@@ -42,7 +42,7 @@ details.odkazy summary{cursor:pointer;font-weight:600;list-style:none}details.od
 .tecka.ok{background:var(--ok)}.tecka.pomalá{background:var(--pomala)}.tecka.mrtvá{background:var(--mrtva)}.tecka.nic{background:var(--nic)}.tecka.skryta{background:#7c3aed}.tecka.vyp{background:#cbd2d9}
 .stitky{position:absolute;top:7px;right:7px;display:flex;gap:4px}
 .st-k{font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:5px;color:#fff;background:rgba(15,23,42,.65)}
-.typ-ytkanal,.typ-ytdlp{background:#dc2626}.typ-skyline{background:#2563eb}.typ-feratel,.typ-holidayinfo{background:#16a34a}.typ-mjpeg,.typ-ipcamlive{background:#9333ea}.typ-direct,.typ-regex,.typ-auto{background:#475569}.typ-snimek{background:#0891b2}
+.typ-ytkanal,.typ-ytdlp{background:#dc2626}.typ-skyline{background:#2563eb}.typ-feratel,.typ-holidayinfo{background:#16a34a}.typ-mjpeg,.typ-ipcamlive{background:#9333ea}.typ-direct,.typ-regex,.typ-auto{background:#475569}.typ-snimek{background:#0891b2}.typ-rtsp{background:#b45309}
 .popis{padding:9px 11px 6px;flex:1}.popis b{display:block;line-height:1.25}.popis .sed{margin-top:3px}
 .lista{display:flex;gap:2px;padding:4px 6px 8px;border-top:1px solid var(--linka)}.lista button{border:0;background:none;cursor:pointer;padding:5px 7px;border-radius:6px;font-size:.95rem}
 .lista button:hover{background:#f1f5f9}
@@ -82,13 +82,13 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 <div class="karta" id="formKarta" style="display:none">
 <h3 id="formNadpis" style="margin:0 0 10px">Kamera</h3>
 <div class="form">
-<label class="siroke">Zdroj – vložte odkaz na kameru (stránka, YouTube, holidayinfo, m3u8…), zbytek se vyplní sám<span style="display:flex;gap:6px"><input id="f_source" placeholder="https://holidayinfo.cz/cs/camera/svpetr" style="flex:1"><button type="button" class="btn" onclick="rozpoznat(true)" title="Zjistit z odkazu typ, název a ID">🪄 Rozpoznat</button></span><span id="f_kamery"></span></label>
+<label class="siroke">Zdroj – vložte odkaz na kameru (stránka, YouTube, holidayinfo, m3u8, rtsp://…), zbytek se vyplní sám<span style="display:flex;gap:6px"><input id="f_source" placeholder="https://holidayinfo.cz/cs/camera/svpetr" style="flex:1"><button type="button" class="btn" onclick="rozpoznat(true)" title="Zjistit z odkazu typ, název a ID">🪄 Rozpoznat</button></span><span id="f_kamery"></span></label>
 <label>ID (a-z, 0-9, -)<input id="f_id" placeholder="pula"></label>
 <label>Název<input id="f_name" placeholder="Pula – přístav"></label>
 <label>Skupina (jen bez země)<input id="f_group" placeholder="Ostatní"></label>
 <label>Země (podle ní kategorie v playlistu)<select id="f_country"></select></label>
 <label>Kategorie<input id="f_category" placeholder="moře"></label>
-<label>Typ<select id="f_type"><option>auto</option><option>direct</option><option>ytdlp</option><option>ytkanal</option><option>skyline</option><option>feratel</option><option>holidayinfo</option><option>ipcamlive</option><option>mjpeg</option><option>regex</option><option>snimek</option></select></label>
+<label>Typ<select id="f_type"><option>auto</option><option>rtsp</option><option>direct</option><option>ytdlp</option><option>ytkanal</option><option>skyline</option><option>feratel</option><option>holidayinfo</option><option>ipcamlive</option><option>mjpeg</option><option>regex</option><option>snimek</option></select></label>
 <label>Název přenosu (ytkanal: kanál + text z názvu, re:… = regex)<input id="f_match" placeholder="Times Square"></label>
 <label>Mód<select id="f_mode"><option>auto</option><option>redirect</option><option>proxy</option></select></label>
 <label title="Jen pro kamery, které dávají obrázek (holidayinfo bez videa, ČHMÚ, snímky)">Zobrazení snímku<select id="f_zobrazeni"><option value="auto">automaticky</option><option value="animace">animace – posun a přiblížení</option><option value="casosber">časosběr</option><option value="stojici">stojící obraz</option></select></label>
@@ -138,7 +138,7 @@ const zemeN = c => c.country ? (D.zeme[c.country.toUpperCase()] || c.country) : 
 const vyska = s => { const m = /x(\d+)/.exec(s.resolution || ''); if (!m) return ''; const h = +m[1]; return h >= 2000 ? '4K' : h >= 1400 ? '1440p' : h >= 1000 ? '1080p' : h >= 700 ? '720p' : h + 'p'; };
 const KVALITY = ['4K', '1440p', '1080p', '720p', 'nižší', 'nezjištěno'];
 const kvalita = s => { const v = vyska(s); return !v || v === '0p' ? 'nezjištěno' : KVALITY.includes(v) ? v : 'nižší'; };
-const typN = t => ({ytkanal: 'YouTube', ytdlp: 'YouTube', skyline: 'Skyline', feratel: 'Feratel', holidayinfo: 'Holidayinfo', mjpeg: 'MJPEG', ipcamlive: 'IPCam', direct: 'm3u8', regex: 'web', snimek: 'snímek', auto: 'auto'}[t] || t);
+const typN = t => ({ytkanal: 'YouTube', ytdlp: 'YouTube', skyline: 'Skyline', feratel: 'Feratel', holidayinfo: 'Holidayinfo', mjpeg: 'MJPEG', ipcamlive: 'IPCam', direct: 'm3u8', regex: 'web', snimek: 'snímek', rtsp: 'RTSP', auto: 'auto'}[t] || t);
 const nahled = c => `../thumb/${encodeURIComponent(c.id)}.jpg?k=${encodeURIComponent(KL)}&t=${Date.now() / 3600000 | 0}`;
 
 async function nacti() {
@@ -390,7 +390,7 @@ async function otestovat() {
 // ROZPOZNEJ_ODKAZ_V1: vložený odkaz → typ, název, ID, země… a rovnou test
 async function rozpoznat(rucne) {
   const src = document.getElementById('f_source').value.trim(), v = document.getElementById('vysl'), kv = document.getElementById('f_kamery');
-  if (!/^https?:\/\//.test(src)) { if (rucne) v.innerHTML = '<span class="st mrtvá">Vložte celý odkaz (https://…)</span>'; return; }
+  if (!/^(https?|rtsps?):\/\//i.test(src)) { if (rucne) v.innerHTML = '<span class="st mrtvá">Vložte celý odkaz (https://… nebo rtsp://…)</span>'; return; }
   v.innerHTML = '<span class="sed">Zjišťuji z odkazu…</span>'; kv.innerHTML = '';
   try {
     const r = await api('rozpoznej', {method: 'POST', body: JSON.stringify({source: src})});
