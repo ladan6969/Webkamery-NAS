@@ -123,7 +123,8 @@ def config():
 CAM_DEFAULT = {"name": "", "group": "Ostatní", "country": "", "category": "", "source": "", "type": "auto",
                "headers": {}, "mode": "auto", "enabled": True, "regex": "", "match": "",
                "page": "", "note": "", "oblibena": False, "zobrazeni": "auto",
-               "uhd": False}       # YT_4K_V1: YouTube kamera ve 4K (/cam4k, jen kde je instalace yt4k)
+               "uhd": False,       # YT_4K_V1: YouTube kamera ve 4K (/cam4k, jen kde je instalace yt4k)
+               "rtsp_primo": True}  # RTSP_PRIMO_V1: Kodi/E2/VLC dostanou v playlistu rovnou rtsp:// (bez ffmpegu služby)
 
 
 def cams():

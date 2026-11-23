@@ -59,6 +59,12 @@ def mode_for(cam, client, st=None):
     return m
 
 
+def rtsp_primo(c, client):
+    """RTSP_PRIMO_V1 (22. 11. 2026): přes ffmpeg služby RTSP seká (časové značky Tapo, Wi-Fi), Kodi s rtsp:// přímo hraje plynule.
+    Adresa i s přihlášením kamery je pak v playlistu (chráněném klíčem) – jen pro kamery v domácí síti zařízení."""
+    return client in ("kodi", "vlc", "e2") and resolver.typ_odhad(c) == "rtsp" and c.get("rtsp_primo", True)
+
+
 def m3u(cfg, client, key, podle=None, cz=None):
     cams, s = _viditelne(cfg, podle, cz, oblibene=True)
     b = store.base(cfg)
@@ -67,6 +73,9 @@ def m3u(cfg, client, key, podle=None, cz=None):
         out.append('#EXTINF:-1 tvg-id="%s" tvg-name="%s" tvg-logo="%s/thumb/%s.jpg?k=%s" group-title="%s",%s' % (
             c["id"], c["name"].replace('"', "'"), b, quote(c["id"]), quote(key), c["kategorie"].replace('"', "'"), c["name"]))
         url = cam_url(cfg, c["id"], client, key)
+        if rtsp_primo(c, client):
+            out.append(c["source"].strip())        # RTSP_PRIMO_V1: přehrávač bere kameru sám (jako .strm v Kodi)
+            continue
         mjpeg = resolver.typ_odhad(c) == "mjpeg" or (s["cams"].get(c["id"]) or {}).get("type_used") == "mjpeg"
         if client == "kodi" and c.get("uhd") and yt4k.dostupne(cfg):
             # YT_4K_V1 (16. 11. 2026): YouTube ve 4K jako fMP4; když 4K nejde, /cam4k přesměruje na běžnou cestu
@@ -99,7 +108,7 @@ def bouquet(cfg, key, podle=None, cz=None):
         if c["id"] not in s["sids"]:
             zmena = True
         sid = store.sid_for(s, c["id"])
-        url = quote(cam_url(cfg, c["id"], "e2", key), safe="")
+        url = quote(c["source"].strip() if rtsp_primo(c, "e2") else cam_url(cfg, c["id"], "e2", key), safe="")
         out.append("#SERVICE 4097:0:1:%X:0:0:0:0:0:0:%s:%s" % (sid, url, c["name"]))
         out.append("#DESCRIPTION %s" % c["name"])
     if zmena:

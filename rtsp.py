@@ -23,7 +23,10 @@ _uklid = {"task": None}
 
 
 def ffmpeg_vstup(url):
-    return ["-rtsp_transport", "tcp", "-timeout", "15000000", "-fflags", "+genpts+discardcorrupt", "-i", url]
+    # RTSP_CAS_V1 (22. 11. 2026): Tapo C220 posílá pakety bez časových značek / se skoky → s +genpts ~10× za s
+    # „Non-monotonic DTS“ a díry 0,4 s (sekání; .strm v Kodi plynule). Čas příjmu místo značek kamery: 2 varování / 12 s.
+    return ["-rtsp_transport", "tcp", "-timeout", "15000000", "-use_wallclock_as_timestamps", "1",
+            "-fflags", "+discardcorrupt", "-i", url]
 
 
 ZVUK = ["-c:a", "aac", "-b:a", "96k", "-ac", "2"]
@@ -68,7 +71,7 @@ async def spustit(cfg, cid, url):
         d = tempfile.mkdtemp(prefix=re.sub(r"[^a-z0-9_-]", "", cid) + "-", dir=KOREN)
         args = (["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error"] + ffmpeg_vstup(url) +
                 ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "copy"] + ZVUK +
-                ["-f", "hls", "-hls_time", "2", "-hls_list_size", "6", "-hls_flags", "delete_segments+omit_endlist+independent_segments",
+                ["-f", "hls", "-hls_time", "2", "-hls_list_size", "10", "-hls_flags", "delete_segments+omit_endlist+independent_segments",
                  "-hls_segment_filename", os.path.join(d, "s%06d.ts"), os.path.join(d, "i.m3u8")])
         p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
         z = BEZI[cid] = {"p": p, "dir": d, "posledni": time.time(), "url": url}

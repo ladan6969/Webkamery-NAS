@@ -93,6 +93,7 @@ tr.skupina td{background:#eef2ff;font-weight:600;color:#3730a3;padding:6px 8px}
 <label>Mód<select id="f_mode"><option>auto</option><option>redirect</option><option>proxy</option></select></label>
 <label title="Jen pro kamery, které dávají obrázek (holidayinfo bez videa, ČHMÚ, snímky)">Zobrazení snímku<select id="f_zobrazeni"><option value="auto">automaticky</option><option value="animace">animace – posun a přiblížení</option><option value="casosber">časosběr</option><option value="stojici">stojící obraz</option></select></label>
 <label title="YT_4K_V1: YouTube přenos ve 4K (VP9) jako MP4 – Kodi i přehrávač tady. Potřebuje instalaci yt4k (Odroid) a přehrávač s VP9 4K; když 4K nejde, hraje běžně do 1080p.">4K (YouTube)<select id="f_uhd"><option value="">ne – běžně do 1080p</option><option value="1">ano – 4K, když to přenos má</option></select></label>
+<label title="RTSP_PRIMO_V1: Kodi, Enigma2 a VLC dostanou v playlistu rovnou adresu rtsp:// – hraje plynuleji než přes službu, ale adresa i s heslem kamery je v playlistu. Přehrávač ve správě jde vždy přes službu.">RTSP v Kodi / E2 / VLC<select id="f_rtsp_primo"><option value="1">napřímo – plynulejší</option><option value="">přes službu (ffmpeg)</option></select></label>
 <label>Regex (jen typ regex)<input id="f_regex" placeholder="výchozí: …\.m3u8…"></label>
 <label class="siroke">Hlavičky (JSON, např. {"Referer":"https://…"})<textarea id="f_headers" rows="2">{}</textarea></label>
 </div>
@@ -342,7 +343,9 @@ async function prehratHls(c, id, url, box, stav) {
     if (v.canPlayType('application/vnd.apple.mpegurl') && !window.MediaSource) { v.src = url; return; }   // Safari na iPhonu
     await nactiHls();
     if (!Hls.isSupported()) { v.src = url; return; }
-    HLS = new Hls({lowLatencyMode: false, capLevelToPlayerSize: false});
+    // RTSP_PRIMO_V1: RTSP (Wi-Fi kamery) s větší rezervou – hraje ~8 s za živým koncem, výkyvy sítě nepřeruší obraz
+    const rez = (c.type === 'rtsp' || /^rtsps?:/i.test(c.source || '')) ? {liveSyncDurationCount: 4, liveMaxLatencyDurationCount: 9, maxBufferHole: 1, maxLiveSyncPlaybackRate: 1} : {};
+    HLS = new Hls(Object.assign({lowLatencyMode: false, capLevelToPlayerSize: false}, rez));
     HLS.on(Hls.Events.MANIFEST_PARSED, (e, d) => { HLS.startLevel = d.levels.length - 1; });   // náhled hned v nejvyšší kvalitě, níž jen při pomalé lince
     HLS.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) stav.textContent = 'Kamera teď nejde přehrát (' + (d.response && d.response.code ? 'HTTP ' + d.response.code : d.details) + ').'; });
     HLS.loadSource(url); HLS.attachMedia(v);
@@ -361,6 +364,7 @@ function vyplnit(c) {
   pole.forEach(p => document.getElementById('f_' + p).value = c[p] ?? (p === 'type' || p === 'mode' || p === 'zobrazeni' ? 'auto' : ''));
   document.getElementById('f_headers').value = JSON.stringify(c.headers || {});
   document.getElementById('f_uhd').value = c.uhd ? '1' : '';
+  document.getElementById('f_rtsp_primo').value = c.rtsp_primo === false ? '' : '1';
   document.getElementById('vysl').innerHTML = '';
   document.getElementById('formKarta').style.display = '';
   document.getElementById('formKarta').scrollIntoView({behavior: 'smooth'});
@@ -372,6 +376,7 @@ function formData() {
   const d = {}; pole.forEach(p => d[p] = document.getElementById('f_' + p).value.trim());
   try { d.headers = JSON.parse(document.getElementById('f_headers').value || '{}'); } catch (e) { throw new Error('Hlavičky nejsou platný JSON'); }
   d.uhd = document.getElementById('f_uhd').value === '1';
+  d.rtsp_primo = document.getElementById('f_rtsp_primo').value === '1';
   d.enabled = puvodni ? (D.cams.find(x => x.id === puvodni) || {}).enabled !== false : true;
   return d;
 }

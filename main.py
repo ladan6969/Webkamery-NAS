@@ -699,6 +699,7 @@ def _cista_kamera(d):
     c["enabled"] = bool(c["enabled"])
     c["oblibena"] = bool(c["oblibena"])
     c["uhd"] = bool(c.get("uhd"))
+    c["rtsp_primo"] = bool(c.get("rtsp_primo", True))
     return c
 
 
