@@ -879,6 +879,62 @@ async def kodi_soubor(name: str):
         raise HTTPException(404)
     return FileResponse(p, media_type="application/zip")
 
+# STRANKA_ODKAZ_V1 (23. 11. 2026, uživatel: „poradit mu, jak dostat ze stránky odkaz kamery“ → „to zní dobře – rozpoznat“):
+# Rozpoznat u obecné stránky najde v kódu (i v rámcích <iframe>) přehrávač ipcamlive, odkazy .m3u8 a YouTube a dočasné
+# odkazy převede na trvalé (chunklist_w… → playlist.m3u8; ipcamlive jen přes alias – ID streamu se mění).
+_CHUNKLIST = re.compile(r"^(.*/)chunklist_w\d+(?:_b\d+)?\.m3u8(?:\?.*)?$", re.I)
+
+
+async def _trvaly_odkaz(u):
+    m = _CHUNKLIST.match(u)
+    if not m:
+        return u
+    try:
+        text, _ = await hls.fetch_text(CFG, m.group(1) + "playlist.m3u8")
+        if "#EXTM3U" in text:
+            return m.group(1) + "playlist.m3u8"
+    except Exception:
+        pass
+    return u
+
+
+async def _hledej_zdroje(text, base, hloubka=0):
+    import html as _html
+    from urllib.parse import urljoin
+    t = _html.unescape(text.replace("\\/", "/"))
+    kand = []
+
+    def pridej(src, typ, popis):
+        if src not in [k["source"] for k in kand]:
+            kand.append({"source": src, "type": typ, "popis": popis})
+
+    for m in re.finditer(r"ipcamlive\.com/player/player\.php\?(?:[^\"'<>\s]*?&)?alias=([\w-]+)", t, re.I):
+        pridej("https://www.ipcamlive.com/player/player.php?alias=" + m.group(1), "ipcamlive", "přehrávač ipcamlive (alias %s)" % m.group(1))
+    for m in list(re.finditer(r"(?:https?:)?//[^\s\"'<>\\]+?\.m3u8(?:\?[^\s\"'<>\\]*)?", t))[:5]:
+        u = urljoin(base, m.group(0))
+        if re.search(r"\.ipcamlive\.com/streams/", u, re.I):
+            continue                                    # dočasné ID – alias je výš
+        pridej(await _trvaly_odkaz(u), "direct", "stream m3u8")
+    for m in re.finditer(r"youtube(?:-nocookie)?\.com/embed/([\w-]{11})(?![\w-])", t):
+        if m.group(1) != "live_stream":
+            pridej("https://www.youtube.com/watch?v=" + m.group(1), "auto", "YouTube")
+    for m in re.finditer(r"youtube\.com/embed/live_stream\?channel=([\w-]+)", t):
+        pridej("https://www.youtube.com/channel/%s/live" % m.group(1), "auto", "YouTube kanál – živě")
+    if not kand and hloubka == 0:
+        for m in list(re.finditer(r"<iframe[^>]+src=[\"']([^\"']+)", text, re.I))[:4]:
+            u = urljoin(base, _html.unescape(m.group(1)))
+            if not u.startswith("http") or re.search(r"google\.|facebook\.|twitter\.|doubleclick|mapy\.cz|seznam\.cz/reklama", u):
+                continue
+            if re.search(r"ipcamlive|youtube|\.m3u8", u, re.I):
+                kand += await _hledej_zdroje(u, base, 1)
+                continue
+            try:
+                t2, u2 = await hls.fetch_text(CFG, u)
+                kand += await _hledej_zdroje(t2, u2, 1)
+            except Exception:
+                pass
+    return kand
+
 
 @app.post("/admin/api/rozpoznej")
 async def api_rozpoznej(request: Request):
@@ -899,6 +955,14 @@ async def api_rozpoznej(request: Request):
         while nid in ids:
             nid = "%s-%d" % (zakl, n); n += 1
         out["id"] = nid
+        return out
+    src2 = await _trvaly_odkaz(src)                 # STRANKA_ODKAZ_V1: chunklist_w… → playlist.m3u8
+    if src2 != src:
+        src = out["source"] = src2
+        out["poznamka"] = "Dočasný odkaz chunklist_w… převeden na stálý playlist.m3u8."
+    if re.search(r"\.ipcamlive\.com/streams/", src, re.I):
+        out.update(type="direct", poznamka="Odkaz ipcamlive obsahuje dočasné ID streamu – časem přestane fungovat. "
+                                          "Vložte raději stránku s kamerou, Rozpoznat najde trvalý alias.")
         return out
     typ = resolver.typ_odhad({"source": src, "type": "auto", "match": ""})
     try:
@@ -932,7 +996,14 @@ async def api_rozpoznej(request: Request):
         if typ != "holidayinfo" and not out.get("name"):     # obecně: název stránky (og:title / <title>), i když YouTube oEmbed název nedal
             out["type"] = typ if typ in ("feratel", "skyline", "ipcamlive", "mjpeg") else "auto"
             if not re.search(r"\.(m3u8|mjpg|jpg|jpeg|png|mp4)(\?|$)", src, re.I):
-                text, _ = await hls.fetch_text(CFG, src)
+                text, url_str = await hls.fetch_text(CFG, src)
+                if typ == "ytdlp" and not re.search(r"youtu\.?be", src):        # STRANKA_ODKAZ_V1
+                    nal = await _hledej_zdroje(text, url_str)
+                    if nal:
+                        out.update(source=nal[0]["source"], type=nal[0]["type"], nalezeno=nal[:10], stranka=src,
+                                   poznamka="Na stránce nalezen zdroj: %s." % nal[0]["popis"])
+                    else:
+                        out["poznamka"] = "Na stránce jsem přímý odkaz nenašel – zkusí se přes yt-dlp (Otestovat)."
                 mt = re.search(r"<meta[^>]+property=[\"']og:title[\"'][^>]+content=[\"']([^\"']+)", text, re.I) or re.search(r"<title[^>]*>([^<]+)</title>", text, re.I)
                 if mt:
                     import html as _html

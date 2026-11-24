@@ -411,6 +411,12 @@ async function rozpoznat(rucne) {
       const bv = document.getElementById('f_kamvse');
       if (bv) bv.onclick = () => pridatVsechnyHI(nove);
     }
+    // STRANKA_ODKAZ_V1: zdroje nalezené na stránce (víc → výběr) a poznámka (dočasný odkaz převeden / nenalezen)
+    if (r.nalezeno && r.nalezeno.length > 1) {
+      kv.innerHTML = `Na stránce nalezeno (${r.nalezeno.length}): <select id="f_nalsel">` + r.nalezeno.map((k, i) => `<option value="${i}">${esc(k.popis)} – ${esc(k.source)}</option>`).join('') + '</select>';
+      document.getElementById('f_nalsel').onchange = e => { const k = r.nalezeno[+e.target.value]; document.getElementById('f_source').value = k.source; document.getElementById('f_type').value = k.type; otestovat(); };
+    }
+    if (r.poznamka) kv.innerHTML += (kv.innerHTML ? '<br>' : '') + '<span class="sed">' + esc(r.poznamka) + '</span>';
     if (r.chyba) v.innerHTML = '<div class="sed">Název se nepodařilo zjistit (' + esc(r.chyba) + ') – doplňte ho.</div>';
     await otestovat();
   } catch (e) { v.innerHTML = '<span class="st mrtvá">' + esc(e.message || e) + '</span>'; }
