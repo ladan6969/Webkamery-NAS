@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import time
+import zlib
 from urllib.parse import urljoin, urlparse
 
 import cache
@@ -146,6 +147,7 @@ async def lehka(cfg, cam, thumb_dest=None, rozliseni=False):
         r.update(ok=True, status="ok", seconds=round(time.time() - t0, 1))
     except Exception as e:
         r["error"] = str(e)[:400] or e.__class__.__name__
+        r["blok"] = isinstance(e, resolver.YtBlok)
     return r
 
 
@@ -201,7 +203,32 @@ async def probe(cfg, cam, thumb_dest=None, live_wait=None):
         cache.put(cam["id"], url, headers, typ, cfg)       # čerstvý odkaz rovnou do cache
     except Exception as e:
         r["error"] = str(e)[:400] or e.__class__.__name__
+        r["blok"] = isinstance(e, resolver.YtBlok)
     return r
+
+
+def je_youtube(cam):
+    return cam.get("type") in ("ytdlp", "ytkanal") or (cam.get("type") in ("auto", "regex") and "youtu" in (cam.get("source") or ""))
+
+
+def _yt_dnes_preskocit(cam, st_cam, cfg):
+    """YT_SETRNE_V1: kamera z YouTube, která hraje, se v noční kontrole zkouší jen jednou za yt_kontrola_dni (výchozí 7),
+    rozložené po dnech podle id (každou noc ~1/7). Oblíbené a ty, co naposledy nešly, každou noc. yt_kontrola=false = vůbec."""
+    if not je_youtube(cam):
+        return False
+    if cfg.get("yt_kontrola") is False:
+        return True
+    dni = int(cfg.get("yt_kontrola_dni", 7))
+    st_cam = st_cam or {}
+    if dni <= 1 or cam.get("oblibena") or st_cam.get("fail_streak", 0) or not st_cam.get("last_ok"):
+        return False
+    try:
+        posledni = time.mktime(time.strptime(st_cam.get("last_check") or "", "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        return False
+    if time.time() - posledni > (dni + 1) * 86400:
+        return False
+    return zlib.crc32(cam["id"].encode()) % dni != int(time.time() // 86400) % dni
 
 
 def visible(st_cam, cfg):
@@ -273,9 +300,9 @@ async def check_all(cfg, only=None):
     cams = [c for c in store.cams() if (only is None and c["enabled"]) or (vyber and c["id"] in vyber)]
     if only is None:
         st = store.state()["cams"]                 # jednou – ne pro každou kameru (7. 11. 2026: 7 000× načtení zablokovalo službu)
-        cams = [c for c in cams if not _jen_tydne(st.get(c["id"]), cfg)]
+        cams = [c for c in cams if not _jen_tydne(st.get(c["id"]), cfg) and not _yt_dnes_preskocit(c, st.get(c["id"]), cfg)]
     cams.sort(key=lambda c: (c.get("type") != "ytkanal", c.get("source")))      # kamery jednoho kanálu za sebou → jeden výpis kanálu
-    running.update(active=True, done=0, total=len(cams), started=time.time(), zastavit=False)
+    running.update(active=True, done=0, total=len(cams), started=time.time(), zastavit=False, blokovano=0)
     zmeny = {"nove_mrtve": [], "ozivene": []}
     thumbs = os.path.join(store.BASE, cfg["thumbs_dir"])
     os.makedirs(thumbs, exist_ok=True)
@@ -318,8 +345,13 @@ async def check_all(cfg, only=None):
                                 rozliseni=c.get("type") == "skyline" and _rozliseni_stare(prev))
             else:
                 r = await probe(cfg, c, os.path.join(thumbs, c["id"] + ".jpg"))
-            was_visible = visible(prev, cfg)
             now = time.strftime("%Y-%m-%d %H:%M:%S")
+            if r.get("blok"):                              # YT_SETRNE_V1: blokace YouTube ≠ mrtvá kamera – stav beze změny
+                cekajici[c["id"]] = {"blok_kdy": now}
+                running["done"] += 1
+                running["blokovano"] = running.get("blokovano", 0) + 1
+                continue
+            was_visible = visible(prev, cfg)
             x = dict(prev)
             x.update(status=r["status"], last_check=now, error=r["error"], seconds=r["seconds"])
             if r["ok"] and r.get("lehka"):                # lehká kontrola: rozlišení jen občas (skyline) – jinak nechat poslední známé
@@ -358,7 +390,7 @@ async def check_all(cfg, only=None):
         running["active"] = False
     if only is None and (zmeny["nove_mrtve"] or zmeny["ozivene"]):
         await telegram(cfg, zmeny)
-    return {"zkontrolovano": len(cams), **zmeny}
+    return {"zkontrolovano": len(cams), "blokovano_youtube": running.get("blokovano", 0), **zmeny}
 
 
 async def telegram(cfg, zmeny):

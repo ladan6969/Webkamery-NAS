@@ -605,7 +605,8 @@ async def health():
     ok = sum(1 for c in zap if s["cams"].get(c["id"], {}).get("status") in ("ok", "pomalá"))
     skryte = sum(1 for c in zap if not checker.visible(s["cams"].get(c["id"]), CFG))
     return {"verze": VERZE, "kod": KOD_VERZE, "kamer": len(cams), "zapnutych": len(zap), "ok": ok, "skrytych_mrtvych": skryte,
-            "yt_dlp": await resolver.ytdlp_version(), "posledni_kontrola": s["last_check"],
+            "yt_dlp": await resolver.ytdlp_version(), "posledni_kontrola": s["last_check"], "youtube_blok": ({"od": resolver.YT_BLOK["od"], "do": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(resolver.YT_BLOK["do"])), "pocet": resolver.YT_BLOK["pocet"]} if resolver.yt_blokovano() else None), "yt_cookies": bool(resolver._cookies(CFG)),  # YT_SETRNE_V1
+           
             "kontrola_bezi": checker.running["active"], "v_cache": len(cache.snapshot()),
             "yt4k": {"dostupne": yt4k.dostupne(CFG), "proudy": yt4k.stav()}}
 

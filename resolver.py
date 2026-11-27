@@ -36,6 +36,50 @@ class ResolveError(Exception):
     pass
 
 
+class YtBlok(ResolveError):
+    """YT_SETRNE_V1: YouTube odmítá tuto IP (429 / „Sign in to confirm you're not a bot“) – nejde o mrtvou kameru"""
+
+
+# YT_SETRNE_V1 (26. 11. 2026): po noční kontrole 3 300 kamer YouTube zablokoval Odroid i card1 → při blokaci YouTube
+# chvíli vůbec nevolat (15 min, pak 30, 60, 120, nejvýš 180), kamery tím neoznačovat jako mrtvé; s cookies (vedlejší
+# účet Google, soubor yt-cookies.txt) se během blokace zkouší s přihlášením.
+YT_BLOK = {"do": 0.0, "od": None, "pocet": 0, "posledni": "", "kdy": 0.0, "s_cookies": None}
+_BLOK_ZNAKY = ("not a bot", "HTTP Error 429", "Too Many Requests")
+
+
+def yt_blokovano():
+    return time.time() < YT_BLOK["do"]
+
+
+def _je_blok(text):
+    return any(z in text for z in _BLOK_ZNAKY)
+
+
+def _blok_zjisten(text):
+    YT_BLOK["pocet"] += 1
+    pauza = min(10800, 900 * 2 ** min(YT_BLOK["pocet"] - 1, 4))
+    YT_BLOK.update(do=time.time() + pauza, od=YT_BLOK["od"] or time.strftime("%Y-%m-%d %H:%M:%S"), posledni=text[-200:], kdy=time.time())
+    log.warning("YouTube blokuje (%d×), další pokus za %d min: %s", YT_BLOK["pocet"], pauza // 60, text[-160:].replace("\n", " "))
+
+
+def _blok_konec():
+    if YT_BLOK["pocet"]:
+        log.info("YouTube zase odpovídá (blokace od %s)", YT_BLOK["od"])
+    YT_BLOK.update(do=0.0, od=None, pocet=0)
+
+
+def _cookies(cfg):
+    """soubor cookies (Netscape) z vedlejšího účtu Google; None = není"""
+    cesta = cfg.get("yt_cookies") or "yt-cookies.txt"
+    if not os.path.isabs(cesta):
+        cesta = os.path.join(os.path.dirname(os.path.abspath(__file__)), cesta)
+    return cesta if os.path.isfile(cesta) and os.path.getsize(cesta) > 100 else None
+
+
+def _blok_zprava():
+    return "YouTube dočasně blokuje (od %s, další pokus %s)" % (YT_BLOK["od"], time.strftime("%H:%M", time.localtime(YT_BLOK["do"])))
+
+
 class NeniZive(ResolveError):
     """video YouTube už nevysílá; kanál a název z údajů videa → hledat nový přenos na stejném kanálu"""
     def __init__(self, msg, kanal=None, nazev=None):
@@ -60,7 +104,7 @@ async def _direct(cfg, cam):
 
 
 async def _ytdlp(cfg, cam):
-    args = [YTDLP, "-J", "--no-warnings", "--no-playlist", "--no-cache-dir", "--socket-timeout", "15"] + _js_runtime()
+    args = [YTDLP, "-J", "--no-playlist", "--no-cache-dir", "--socket-timeout", "15"] + _js_runtime()
     for k, v in (cam.get("headers") or {}).items():
         args += ["--add-header", "%s:%s" % (k, v)]
     args.append(cam["source"])
@@ -74,15 +118,32 @@ async def _ytdlp(cfg, cam):
                 p.kill()
                 await p.wait()
                 raise ResolveError("yt-dlp: timeout %d s" % cfg["resolve_timeout"])
-        return p.returncode, out, (err.decode(errors="replace").strip().splitlines() or ["?"])[-1]
+        e = err.decode(errors="replace").strip()
+        radky = [x for x in e.splitlines() if x.startswith("ERROR")] or e.splitlines() or ["?"]
+        return p.returncode, out, radky[-1], e
 
-    rc, out, msg = await _spust(args)
+    cookies = _cookies(cfg)
+    if yt_blokovano():
+        if not cookies:
+            raise YtBlok(_blok_zprava())
+        args = args[:1] + ["--cookies", cookies] + args[1:]       # během blokace jen s přihlášením
+    rc, out, msg, cele = await _spust(args)
+    if rc != 0 and _je_blok(cele) and cookies and "--cookies" not in args:
+        log.info("cam %s: YouTube chce přihlášení – zkouším s cookies", cam.get("id"))
+        args = args[:1] + ["--cookies", cookies] + args[1:]
+        rc, out, msg, cele = await _spust(args)
+        YT_BLOK["s_cookies"] = rc == 0
     # YT_MWEB_V1: majitel zakázal přehrávání mimo YouTube (embed) → výchozí klienti yt-dlp (tv/android_vr) odmítnou,
     # mobilní web (mweb) přenos načte (16. 11. Panorama zYLsqXPfMqw)
     if rc != 0 and "other websites has been disabled" in msg and re.search(r"youtu\.?be", cam["source"]):
-        rc, out, msg = await _spust(args[:-1] + ["--extractor-args", "youtube:player_client=mweb", cam["source"]])
+        rc, out, msg, cele = await _spust(args[:-1] + ["--extractor-args", "youtube:player_client=mweb", cam["source"]])
     if rc != 0:
+        # „This video is not available“ chodí při blokaci i bez 429 – za blokaci se bere, když byla zjištěná v poslední hodině
+        if _je_blok(cele) or ("This video is not available" in msg and time.time() - YT_BLOK["kdy"] < 3600):
+            _blok_zjisten(cele)
+            raise YtBlok("yt-dlp: " + _blok_zprava())
         raise ResolveError("yt-dlp: " + msg[:300])
+    _blok_konec()
     d = json.loads(out)
     if d.get("_type") == "playlist" and d.get("entries"):
         d = d["entries"][0]
@@ -263,7 +324,11 @@ def _kanal_zamek(k):
 
 
 async def _vypis_kanalu(cfg, kanal):
-    p = await asyncio.create_subprocess_exec(YTDLP, "--flat-playlist", "-J", "--no-warnings", "--no-cache-dir", "--playlist-end", "80",
+    cookies = _cookies(cfg)
+    if yt_blokovano() and not cookies:
+        raise YtBlok("ytkanal: " + _blok_zprava())
+    extra = ["--cookies", cookies] if yt_blokovano() else []
+    p = await asyncio.create_subprocess_exec(YTDLP, "--flat-playlist", "-J", "--no-cache-dir", "--playlist-end", "80", *extra,
                                              kanal + "/streams", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     try:
         out, err = await asyncio.wait_for(p.communicate(), timeout=cfg["resolve_timeout"])
@@ -271,7 +336,11 @@ async def _vypis_kanalu(cfg, kanal):
         p.kill()
         raise ResolveError("ytkanal: timeout výpisu kanálu")
     if p.returncode != 0:
-        raise ResolveError("ytkanal: " + ((err.decode(errors="replace").strip().splitlines() or ["?"])[-1])[:200])
+        e = err.decode(errors="replace").strip()
+        if _je_blok(e):
+            _blok_zjisten(e)
+            raise YtBlok("ytkanal: " + _blok_zprava())
+        raise ResolveError("ytkanal: " + (([x for x in e.splitlines() if x.startswith("ERROR")] or e.splitlines() or ["?"])[-1])[:200])
     zive = [(e["id"], e.get("title") or "") for e in (json.loads(out).get("entries") or []) if e.get("live_status") == "is_live"]
     _kanaly[kanal] = (time.time(), zive)
     return zive
@@ -364,12 +433,16 @@ async def _ytdlp_cam(cfg, cam):
     if cid in _ze_stranky:
         try:
             return await _ytdlp(cfg, dict(cam, source=_ze_stranky[cid]))
+        except YtBlok:
+            raise
         except ResolveError:
             _ze_stranky.pop(cid, None)             # i nové video skončilo – zkusit znovu od začátku
     if cid in _naucene:
         kanal, nazev = _naucene[cid]
         try:
             return (await _novy_prenos(cfg, cam, kanal, nazev))[0]
+        except YtBlok:
+            raise
         except ResolveError:
             pass                                   # třeba původní video zase vysílá
     try:
@@ -378,7 +451,7 @@ async def _ytdlp_cam(cfg, cam):
         zmeny.pop(cid, None)
         return url
     except ResolveError as e:
-        if "watch?v=" not in cam["source"]:
+        if isinstance(e, YtBlok) or "watch?v=" not in cam["source"]:
             raise
         try:
             nove = await _video_ze_stranky(cfg, cam)
@@ -472,6 +545,7 @@ def _poradi(cam):
 async def resolve(cfg, cam):
     """→ (url, typ). Chyby všech pokusů dohromady jako ResolveError."""
     chyby = []
+    blok = False
     for t in _poradi(cam):
         try:
             url = await RESOLVERS[t](cfg, cam)
@@ -481,9 +555,10 @@ async def resolve(cfg, cam):
             return url, t
         except ResolveError as e:
             chyby.append(str(e))
+            blok = blok or isinstance(e, YtBlok)
         except Exception as e:   # síť, HTTP chyby…
             chyby.append("%s: %s" % (t, e.__class__.__name__ + (" " + str(e) if str(e) else "")))
-    raise ResolveError(" | ".join(chyby)[:600])
+    raise (YtBlok if blok else ResolveError)(" | ".join(chyby)[:600])
 
 
 async def ytdlp_version():
